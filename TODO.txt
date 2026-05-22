@@ -1,3 +1,8 @@
+IMPORTANT: seems like there's bug with the giving the key. It was implemented in the beginning, but as code grew it wasnt
+adjusted or removed. So, in fact you have changes to the database, just they work unreliably.
+
+- Try to make sense of the code, as it's kind of difficult to read.
+
 - For now getting the key is only between two members. So, rename the button to "got the key from member"
 - Add button "got the key from mailbox".
 - Now got the key button handlers only display messages, they do not change state of database.
