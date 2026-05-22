@@ -1,0 +1,4 @@
+- For now getting the key is only between two members. So, rename the button to "got the key from member"
+- Add button "got the key from mailbox".
+- Now got the key button handlers only display messages, they do not change state of database.
+Implement the change to database.

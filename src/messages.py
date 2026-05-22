@@ -15,6 +15,22 @@ HANDOVER_READY_ANSWER = "Ready for handover."
 HANDOVER_READY_TEXT = (
     "Give the key to the next member and ask them to press Got the key."
 )
+HANDOVER_COMPLETED_ANSWER = "Handover completed."
+HANDOVER_COMPLETED_TEXT = "The key was handed over from {from_member} to {to_member}."
+HANDOVER_CONFIRMATION_PROMPT = (
+    "Please confirm that you got the key from {from_member}."
+)
+HANDOVER_FAILED_TEXT = (
+    "The handover procedure failed. You remain the recorded key holder."
+)
+HANDOVER_ALREADY_PENDING_ANSWER = "Handover already pending."
+HANDOVER_ALREADY_PENDING_TEXT = (
+    "A handover is already pending. Ask the next member to press Got the key."
+)
+HANDOVER_SELF_CONFIRMATION_ANSWER = "Ask the next member to press Got the key."
+HANDOVER_SELF_CONFIRMATION_TEXT = (
+    "The current holder cannot complete their own handover."
+)
 
 MISSING_TELEGRAM_USER_ANSWER = "Could not identify you."
 MISSING_TELEGRAM_USER_TEXT = (
