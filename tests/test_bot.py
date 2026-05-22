@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import src.bot as bot
+import src.handover_flow as handover_flow
 from src.database import initialize_database
 from src.key_service import ConfirmKeyResult, ConfirmKeyStatus, HandoverResult, HandoverStatus
 from src import messages
@@ -106,9 +107,9 @@ def assert_keyboard_does_not_include_callback(test_case, reply_text_mock, callba
 
 class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
-        for pending_handover in bot.PENDING_HANDOVERS.values():
+        for pending_handover in handover_flow.PENDING_HANDOVERS.values():
             pending_handover.timeout_task.cancel()
-        bot.PENDING_HANDOVERS.clear()
+        handover_flow.PENDING_HANDOVERS.clear()
 
     async def test_reply_with_start_state_sends_main_keyboard(self):
         message = SimpleNamespace(reply_text=AsyncMock())
@@ -253,7 +254,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.READY),
             ),
@@ -274,10 +275,10 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             update.callback_query.message.reply_text,
             bot.KEY_OBTAINED_CALLBACK,
         )
-        self.assertIn(bot.DEFAULT_KEY_ID, bot.PENDING_HANDOVERS)
+        self.assertIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
         self.assertEqual(
             123,
-            bot.PENDING_HANDOVERS[bot.DEFAULT_KEY_ID].holder_user_id,
+            handover_flow.PENDING_HANDOVERS[bot.DEFAULT_KEY_ID].holder_user_id,
         )
 
     async def test_got_key_during_pending_handover_asks_member_to_confirm(self):
@@ -294,7 +295,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.READY),
             ),
@@ -326,7 +327,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bot.CONFIRM_KEY_OBTAINED_CALLBACK, keyboard[0][0].callback_data)
         self.assertEqual("Cancel", keyboard[0][1].text)
         self.assertEqual(bot.CANCEL_KEY_OBTAINED_CALLBACK, keyboard[0][1].callback_data)
-        self.assertIn(bot.DEFAULT_KEY_ID, bot.PENDING_HANDOVERS)
+        self.assertIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
 
     async def test_confirm_completes_pending_handover_without_database_update(self):
         handover_update = create_callback_update(
@@ -342,7 +343,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.READY),
             ),
@@ -377,7 +378,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             confirm_update.callback_query.message.reply_text,
             "The key was handed over from Member One to Member Two.",
         )
-        self.assertNotIn(bot.DEFAULT_KEY_ID, bot.PENDING_HANDOVERS)
+        self.assertNotIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
 
     async def test_completed_handover_sends_one_message_in_shared_chat(self):
         handover_update = create_callback_update(
@@ -395,7 +396,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.READY),
             ),
@@ -430,9 +431,9 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(bot, "HANDOVER_WINDOW_SECONDS", 0),
+            patch.object(handover_flow, "HANDOVER_WINDOW_SECONDS", 0),
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.READY),
             ),
@@ -449,7 +450,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             "The handover procedure failed. You remain the recorded key holder.",
             includes_holder_actions=True,
         )
-        self.assertNotIn(bot.DEFAULT_KEY_ID, bot.PENDING_HANDOVERS)
+        self.assertNotIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
 
     async def test_cancel_pending_handover_returns_both_members_to_start_state(self):
         handover_update = create_callback_update(
@@ -465,7 +466,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.READY),
             ),
@@ -492,7 +493,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             cancel_update.callback_query.message.reply_text,
             "Cancelled. No key-obtained action was recorded.",
         )
-        self.assertNotIn(bot.DEFAULT_KEY_ID, bot.PENDING_HANDOVERS)
+        self.assertNotIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
 
     async def test_current_holder_cannot_complete_own_pending_handover(self):
         handover_update = create_callback_update(
@@ -508,7 +509,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.READY),
             ),
@@ -526,14 +527,14 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             "The current holder cannot complete their own handover.",
             includes_holder_actions=True,
         )
-        self.assertIn(bot.DEFAULT_KEY_ID, bot.PENDING_HANDOVERS)
+        self.assertIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
 
     async def test_key_handover_callback_rejects_non_holder(self):
         update = create_callback_update(bot.KEY_HANDOVER_CALLBACK, telegram_user_id=456)
 
         with (
             patch.object(
-                bot,
+                handover_flow,
                 "start_key_handover",
                 return_value=HandoverResult(status=HandoverStatus.NOT_CURRENT_HOLDER),
             ),
