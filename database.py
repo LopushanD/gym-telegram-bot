@@ -1,8 +1,30 @@
+import random
 import sqlite3
 from pathlib import Path
 
 
 DEFAULT_DATABASE_PATH = Path("gym_bot.sqlite3")
+
+FIRST_NAMES = (
+    "Alex",
+    "Dima",
+    "Ivan",
+    "Maria",
+    "Nina",
+    "Olga",
+    "Pavel",
+    "Sofia",
+)
+SURNAMES = (
+    "Ivanov",
+    "Kuznetsov",
+    "Muller",
+    "Petrov",
+    "Schmidt",
+    "Sokolov",
+    "Smirnov",
+    "Weber",
+)
 
 
 def initialize_database(database_path=DEFAULT_DATABASE_PATH):
@@ -79,3 +101,66 @@ def on_holder_change(database_path, key_id, new_holder_id):
             """,
             (key_id, new_holder_id),
         )
+    connection.close()
+
+def populate_members_table_with_mock_data(
+    database_path=DEFAULT_DATABASE_PATH,
+    n_members=5,
+    rng=None
+):
+    """Populate the members table with random plausible mock members."""
+    if n_members < 0:
+        raise ValueError("n_members must not be negative")
+
+    rng = rng or random.Random()
+    inserted_member_ids = []
+    used_telegram_user_ids = set()
+
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+
+        existing_telegram_user_ids = {
+            row[0]
+            for row in connection.execute(
+                """
+                SELECT telegram_user_id
+                FROM gym_members
+                WHERE telegram_user_id IS NOT NULL
+                """
+            )
+        }
+        used_telegram_user_ids.update(existing_telegram_user_ids)
+
+        for _ in range(n_members):
+            telegram_user_id = _generate_unique_telegram_user_id(
+                rng,
+                used_telegram_user_ids,
+            )
+            cursor = connection.execute(
+                """
+                INSERT INTO gym_members (telegram_user_id, name, surname, room_number)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    telegram_user_id,
+                    rng.choice(FIRST_NAMES),
+                    rng.choice(SURNAMES),
+                    rng.randint(1000, 9999),
+                ),
+            )
+            inserted_member_ids.append(cursor.lastrowid)
+    connection.close()
+
+    return inserted_member_ids
+
+
+def _generate_unique_telegram_user_id(rng, used_telegram_user_ids):
+    while True:
+        telegram_user_id = rng.randint(100_000_000, 999_999_999)
+        if telegram_user_id not in used_telegram_user_ids:
+            used_telegram_user_ids.add(telegram_user_id)
+            return telegram_user_id
+
+if __name__ == "__main__":
+    initialize_database()
+    populate_members_table_with_mock_data(DEFAULT_DATABASE_PATH,5)

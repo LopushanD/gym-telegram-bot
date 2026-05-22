@@ -1,3 +1,4 @@
+import random
 import sqlite3
 import sys
 import tempfile
@@ -7,7 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from database import initialize_database, on_holder_change
+from database import initialize_database, on_holder_change, populate_members_table_with_mock_data
 
 
 def create_gym_member(connection, surname, room_number):
@@ -137,6 +138,47 @@ class DatabaseTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "key does not exist: 999"):
                 on_holder_change(database_path, 999, holder_id)
+
+    def test_populate_members_table_with_mock_data_creates_requested_members(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            member_ids = populate_members_table_with_mock_data(
+                database_path,
+                n_members=7,
+                rng=random.Random(1),
+            )
+
+            with sqlite3.connect(database_path) as connection:
+                members = connection.execute(
+                    """
+                    SELECT id, telegram_user_id, name, surname, room_number
+                    FROM gym_members
+                    ORDER BY id
+                    """
+                ).fetchall()
+
+            self.assertEqual(7, len(member_ids))
+            self.assertEqual(7, len(members))
+            self.assertEqual(member_ids, [member[0] for member in members])
+            self.assertEqual(
+                7,
+                len({member[1] for member in members}),
+            )
+            for _, telegram_user_id, name, surname, room_number in members:
+                self.assertIsInstance(telegram_user_id, int)
+                self.assertTrue(name)
+                self.assertTrue(surname)
+                self.assertGreaterEqual(room_number, 1000)
+                self.assertLessEqual(room_number, 9999)
+
+    def test_populate_members_table_with_mock_data_rejects_negative_member_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+
+            with self.assertRaisesRegex(ValueError, "n_members must not be negative"):
+                initialize_database(database_path)
+                populate_members_table_with_mock_data(database_path, n_members=-1)
 
 
 if __name__ == "__main__":
