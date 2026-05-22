@@ -8,16 +8,21 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from database import initialize_database, on_holder_change, populate_members_table_with_mock_data
+from database import (
+    get_current_key_holder,
+    initialize_database,
+    on_holder_change,
+    populate_members_table_with_mock_data,
+)
 
 
-def create_gym_member(connection, surname, room_number):
+def create_gym_member(connection, surname, room_number, name="Alex"):
     cursor = connection.execute(
         """
-        INSERT INTO gym_members (surname, room_number)
-        VALUES (?, ?)
+        INSERT INTO gym_members (name, surname, room_number)
+        VALUES (?, ?, ?)
         """,
-        (surname, room_number),
+        (name, surname, room_number),
     )
     return cursor.lastrowid
 
@@ -179,6 +184,28 @@ class DatabaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "n_members must not be negative"):
                 initialize_database(database_path)
                 populate_members_table_with_mock_data(database_path, n_members=-1)
+
+    def test_get_current_key_holder_returns_holder_details(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                holder_id = create_gym_member(connection, "Ivanov", 1234, name="Dima")
+                key_id = create_key(connection, holder_id)
+
+            holder = get_current_key_holder(database_path, key_id)
+
+            self.assertEqual(("Dima", "Ivanov", 1234), holder)
+
+    def test_get_current_key_holder_returns_none_for_missing_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            holder = get_current_key_holder(database_path, key_id=999)
+
+            self.assertIsNone(holder)
 
 
 if __name__ == "__main__":

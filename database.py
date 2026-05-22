@@ -103,6 +103,22 @@ def on_holder_change(database_path, key_id, new_holder_id):
         )
     connection.close()
 
+
+def get_current_key_holder(database_path=DEFAULT_DATABASE_PATH, key_id=1):
+    """Return the current holder details for a key, or None if the key is missing."""
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection.execute(
+            """
+            SELECT gym_members.name, gym_members.surname, gym_members.room_number
+            FROM keys
+            JOIN gym_members ON gym_members.id = keys.current_holder_id
+            WHERE keys.id = ?
+            """,
+            (key_id,),
+        ).fetchone()
+
+
 def populate_members_table_with_mock_data(
     database_path=DEFAULT_DATABASE_PATH,
     n_members=5,
