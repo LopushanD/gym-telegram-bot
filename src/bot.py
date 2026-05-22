@@ -1,10 +1,16 @@
 from collections.abc import Awaitable, Callable
-from typing import Final, cast
+from pathlib import Path
+import sys
+from typing import cast
 
 from telegram import CallbackQuery, Message, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
-from buttons import (
+# Let IDEs run this file directly while keeping package imports everywhere else.
+if __package__ is None or __package__ == "":
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.keyboards import (
     CANCEL_KEY_OBTAINED_CALLBACK,
     CONFIRM_KEY_OBTAINED_CALLBACK,
     KEY_HANDOVER_CALLBACK,
@@ -13,9 +19,9 @@ from buttons import (
     build_key_obtained_confirmation_keyboard,
     build_start_keyboard,
 )
-from config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
-from database import initialize_database
-from key_service import (
+from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
+from src.database import initialize_database
+from src.key_service import (
     ConfirmKeyStatus,
     HandoverStatus,
     confirm_key_obtained,
@@ -23,10 +29,31 @@ from key_service import (
     start_key_handover,
     user_currently_holds_key,
 )
+from src.messages import (
+    HANDOVER_NOT_ALLOWED_ANSWER,
+    HANDOVER_NOT_ALLOWED_TEXT,
+    HANDOVER_READY_ANSWER,
+    HANDOVER_READY_TEXT,
+    KEY_OBTAINED_CANCELLED_ANSWER,
+    KEY_OBTAINED_CANCELLED_TEXT,
+    KEY_OBTAINED_CONFIRMATION_PROMPT,
+    KEY_OBTAINED_CONFIRMED_ANSWER,
+    KEY_OBTAINED_CONFIRMED_TEXT,
+    LOOKING_UP_KEY_HOLDER,
+    MISSING_TELEGRAM_USER_ANSWER,
+    MISSING_TELEGRAM_USER_TEXT,
+    NO_KEY_REGISTERED,
+    PLEASE_CONFIRM_KEY_OBTAINED,
+    START_STATE_TEXT,
+    UNKNOWN_CALLBACK_ANSWER,
+    UNKNOWN_CALLBACK_TEXT,
+    UNREGISTERED_USER_ANSWER,
+    UNREGISTERED_USER_TEXT,
+    current_key_holder_text,
+)
 
 
 CallbackHandler = Callable[[CallbackQuery, Message], Awaitable[None]]
-START_STATE_TEXT: Final[str] = "Welcome! The buttons are ready."
 
 
 def get_update_user_id(update: Update) -> int | None:
@@ -94,29 +121,26 @@ async def callback_query_handler(
 async def handle_key_request(query: CallbackQuery, message: Message) -> None:
     holder = get_key_holder(DEFAULT_DATABASE_PATH, key_id=DEFAULT_KEY_ID)
 
-    await query.answer("Looking up the key holder...")
+    await query.answer(LOOKING_UP_KEY_HOLDER)
     if holder is None:
         await reply_with_start_state(
             message,
-            "No key is registered in the database yet.",
+            NO_KEY_REGISTERED,
             telegram_user_id=get_callback_user_id(query),
         )
         return
 
     await reply_with_start_state(
         message,
-        (
-            f"The key is currently held by {holder.name} {holder.surname}, "
-            f"room {holder.room_number}."
-        ),
+        current_key_holder_text(holder),
         telegram_user_id=get_callback_user_id(query),
     )
 
 
 async def handle_key_obtained(query: CallbackQuery, message: Message) -> None:
-    await query.answer("Please confirm.")
+    await query.answer(PLEASE_CONFIRM_KEY_OBTAINED)
     await message.reply_text(
-        "Please confirm that you got the key.",
+        KEY_OBTAINED_CONFIRMATION_PROMPT,
         reply_markup=build_key_obtained_confirmation_keyboard(),
     )
 
@@ -130,18 +154,18 @@ async def handle_key_handover(query: CallbackQuery, message: Message) -> None:
     )
 
     if result.status == HandoverStatus.NOT_CURRENT_HOLDER:
-        await query.answer("Only the current holder can hand over the key.")
+        await query.answer(HANDOVER_NOT_ALLOWED_ANSWER)
         await reply_with_start_state(
             message,
-            "Only the current key holder can start a handover.",
+            HANDOVER_NOT_ALLOWED_TEXT,
             telegram_user_id=telegram_user_id,
         )
         return
 
-    await query.answer("Ready for handover.")
+    await query.answer(HANDOVER_READY_ANSWER)
     await reply_with_start_state(
         message,
-        "Give the key to the next member and ask them to press Got the key.",
+        HANDOVER_READY_TEXT,
         telegram_user_id=telegram_user_id,
     )
 
@@ -158,26 +182,26 @@ async def handle_key_obtained_confirmation(
     )
 
     if result.status == ConfirmKeyStatus.MISSING_TELEGRAM_USER:
-        await query.answer("Could not identify you.")
+        await query.answer(MISSING_TELEGRAM_USER_ANSWER)
         await reply_with_start_state(
             message,
-            "Could not confirm key ownership because Telegram user is missing.",
+            MISSING_TELEGRAM_USER_TEXT,
         )
         return
 
     if result.status == ConfirmKeyStatus.USER_NOT_REGISTERED:
-        await query.answer("You are not registered.")
+        await query.answer(UNREGISTERED_USER_ANSWER)
         await reply_with_start_state(
             message,
-            "Could not confirm key ownership because you are not registered.",
+            UNREGISTERED_USER_TEXT,
             telegram_user_id=telegram_user_id,
         )
         return
 
-    await query.answer("Confirmed.")
+    await query.answer(KEY_OBTAINED_CONFIRMED_ANSWER)
     await reply_with_start_state(
         message,
-        "Confirmed. You are now recorded as the key holder.",
+        KEY_OBTAINED_CONFIRMED_TEXT,
         telegram_user_id=telegram_user_id,
     )
 
@@ -186,19 +210,19 @@ async def handle_key_obtained_cancellation(
     query: CallbackQuery,
     message: Message,
 ) -> None:
-    await query.answer("Cancelled.")
+    await query.answer(KEY_OBTAINED_CANCELLED_ANSWER)
     await reply_with_start_state(
         message,
-        "Cancelled. No key-obtained action was recorded.",
+        KEY_OBTAINED_CANCELLED_TEXT,
         telegram_user_id=get_callback_user_id(query),
     )
 
 
 async def handle_unknown_callback(query: CallbackQuery, message: Message) -> None:
-    await query.answer("Unknown button.")
+    await query.answer(UNKNOWN_CALLBACK_ANSWER)
     await reply_with_start_state(
         message,
-        "Unknown button. Back to the start.",
+        UNKNOWN_CALLBACK_TEXT,
         telegram_user_id=get_callback_user_id(query),
     )
 
@@ -228,7 +252,3 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(callback_query_handler))
     print("Telegram Bot started!", flush=True)
     application.run_polling()
-
-
-if __name__ == "__main__":
-    main()

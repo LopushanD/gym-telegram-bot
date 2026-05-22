@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from config import DEFAULT_KEY_ID
-from database import (
+from src.config import DEFAULT_KEY_ID
+from src.database import (
+    change_key_holder,
     get_current_key_holder,
     get_gym_member_id_by_telegram_user_id,
-    on_holder_change,
 )
 
 
@@ -75,5 +75,5 @@ def confirm_key_obtained(database_path, telegram_user_id, key_id=DEFAULT_KEY_ID)
     if member_id is None:
         return ConfirmKeyResult(status=ConfirmKeyStatus.USER_NOT_REGISTERED)
 
-    on_holder_change(database_path, key_id, member_id)
+    change_key_holder(database_path, key_id, member_id)
     return ConfirmKeyResult(status=ConfirmKeyStatus.CONFIRMED)

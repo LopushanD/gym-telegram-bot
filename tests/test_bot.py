@@ -12,6 +12,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 import src.bot as bot
 from src.database import initialize_database
 from src.key_service import ConfirmKeyResult, ConfirmKeyStatus, HandoverResult, HandoverStatus
+from src import messages
 
 
 def create_callback_update(callback_data, telegram_user_id=None):
@@ -74,7 +75,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_reply_text_with_start_keyboard(
             self,
             message.reply_text,
-            bot.START_STATE_TEXT,
+            messages.START_STATE_TEXT,
         )
 
     async def test_reply_with_start_state_adds_holder_action_for_current_holder(self):
@@ -98,7 +99,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_reply_text_with_start_keyboard(
             self,
             message.reply_text,
-            bot.START_STATE_TEXT,
+            messages.START_STATE_TEXT,
             includes_holder_actions=True,
         )
         assert_keyboard_does_not_include_callback(
@@ -123,7 +124,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_reply_text_with_start_keyboard(
             self,
             message.reply_text,
-            bot.START_STATE_TEXT,
+            messages.START_STATE_TEXT,
         )
 
     async def test_start_command_returns_to_start_state(self):
@@ -142,7 +143,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_reply_text_with_start_keyboard(
             self,
             update.message.reply_text,
-            bot.START_STATE_TEXT,
+            messages.START_STATE_TEXT,
             includes_holder_actions=True,
         )
         assert_keyboard_does_not_include_callback(

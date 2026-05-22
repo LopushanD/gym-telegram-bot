@@ -1,7 +1,7 @@
 import random
 import sqlite3
 
-from config import DEFAULT_DATABASE_PATH
+from src.config import DEFAULT_DATABASE_PATH
 
 
 FIRST_NAMES = (
@@ -67,7 +67,7 @@ def initialize_database(database_path=DEFAULT_DATABASE_PATH):
         )
 
 
-def on_holder_change(database_path, key_id, new_holder_id):
+def change_key_holder(database_path, key_id, new_holder_id):
     """Change a key holder and append the change to holder history."""
     with sqlite3.connect(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")

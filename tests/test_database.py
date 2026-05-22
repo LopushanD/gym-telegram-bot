@@ -12,7 +12,7 @@ from src.database import (
     get_current_key_holder,
     get_gym_member_id_by_telegram_user_id,
     initialize_database,
-    on_holder_change,
+    change_key_holder,
     populate_members_table_with_mock_data,
 )
 
@@ -110,7 +110,7 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual("current_holder_id", foreign_keys[0][3])
             self.assertEqual("id", foreign_keys[0][4])
 
-    def test_on_holder_change_updates_key_holder_and_history(self):
+    def test_change_key_holder_updates_key_holder_and_history(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
@@ -120,7 +120,7 @@ class DatabaseTests(unittest.TestCase):
                 second_holder_id = create_gym_member(connection, "Petrov", 102)
                 key_id = create_key(connection, first_holder_id)
 
-            on_holder_change(database_path, key_id, second_holder_id)
+            change_key_holder(database_path, key_id, second_holder_id)
 
             with sqlite3.connect(database_path) as connection:
                 current_holder_id = connection.execute(
@@ -139,7 +139,7 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual((second_holder_id,), current_holder_id)
             self.assertEqual((key_id, second_holder_id), history_record)
 
-    def test_on_holder_change_rejects_missing_holder(self):
+    def test_change_key_holder_rejects_missing_holder(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
@@ -149,9 +149,9 @@ class DatabaseTests(unittest.TestCase):
                 key_id = create_key(connection, holder_id)
 
             with self.assertRaisesRegex(ValueError, "gym member does not exist: 999"):
-                on_holder_change(database_path, key_id, 999)
+                change_key_holder(database_path, key_id, 999)
 
-    def test_on_holder_change_rejects_missing_key(self):
+    def test_change_key_holder_rejects_missing_key(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
@@ -160,7 +160,7 @@ class DatabaseTests(unittest.TestCase):
                 holder_id = create_gym_member(connection, "Ivanov", 101)
 
             with self.assertRaisesRegex(ValueError, "key does not exist: 999"):
-                on_holder_change(database_path, 999, holder_id)
+                change_key_holder(database_path, 999, holder_id)
 
     def test_populate_members_table_with_mock_data_creates_requested_members(self):
         with tempfile.TemporaryDirectory() as directory:

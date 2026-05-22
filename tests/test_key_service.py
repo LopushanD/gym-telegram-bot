@@ -73,19 +73,19 @@ class KeyServiceTests(unittest.TestCase):
                 "src.key_service.get_gym_member_id_by_telegram_user_id",
                 return_value=42,
             ),
-            patch("src.key_service.on_holder_change") as on_holder_change,
+            patch("src.key_service.change_key_holder") as change_key_holder,
         ):
             result = confirm_key_obtained("database.sqlite3", 123, key_id=1)
 
         self.assertEqual(ConfirmKeyStatus.CONFIRMED, result.status)
-        on_holder_change.assert_called_once_with("database.sqlite3", 1, 42)
+        change_key_holder.assert_called_once_with("database.sqlite3", 1, 42)
 
     def test_confirm_key_obtained_rejects_missing_telegram_user(self):
-        with patch("src.key_service.on_holder_change") as on_holder_change:
+        with patch("src.key_service.change_key_holder") as change_key_holder:
             result = confirm_key_obtained("database.sqlite3", None, key_id=1)
 
         self.assertEqual(ConfirmKeyStatus.MISSING_TELEGRAM_USER, result.status)
-        on_holder_change.assert_not_called()
+        change_key_holder.assert_not_called()
 
     def test_confirm_key_obtained_rejects_unregistered_user(self):
         with (
@@ -93,12 +93,12 @@ class KeyServiceTests(unittest.TestCase):
                 "src.key_service.get_gym_member_id_by_telegram_user_id",
                 return_value=None,
             ),
-            patch("src.key_service.on_holder_change") as on_holder_change,
+            patch("src.key_service.change_key_holder") as change_key_holder,
         ):
             result = confirm_key_obtained("database.sqlite3", 123, key_id=1)
 
         self.assertEqual(ConfirmKeyStatus.USER_NOT_REGISTERED, result.status)
-        on_holder_change.assert_not_called()
+        change_key_holder.assert_not_called()
 
 
 if __name__ == "__main__":
