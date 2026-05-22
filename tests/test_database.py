@@ -10,6 +10,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from database import (
     get_current_key_holder,
+    get_gym_member_id_by_telegram_user_id,
     initialize_database,
     on_holder_change,
     populate_members_table_with_mock_data,
@@ -23,6 +24,23 @@ def create_gym_member(connection, surname, room_number, name="Alex"):
         VALUES (?, ?, ?)
         """,
         (name, surname, room_number),
+    )
+    return cursor.lastrowid
+
+
+def create_gym_member_with_telegram_user_id(
+    connection,
+    telegram_user_id,
+    surname,
+    room_number,
+    name="Alex",
+):
+    cursor = connection.execute(
+        """
+        INSERT INTO gym_members (telegram_user_id, name, surname, room_number)
+        VALUES (?, ?, ?, ?)
+        """,
+        (telegram_user_id, name, surname, room_number),
     )
     return cursor.lastrowid
 
@@ -206,6 +224,82 @@ class DatabaseTests(unittest.TestCase):
             holder = get_current_key_holder(database_path, key_id=999)
 
             self.assertIsNone(holder)
+
+    def test_get_current_key_holder_can_filter_by_telegram_user_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    123456,
+                    "Ivanov",
+                    1234,
+                    name="Dima",
+                )
+                key_id = create_key(connection, holder_id)
+
+            holder = get_current_key_holder(
+                database_path,
+                key_id,
+                telegram_user_id=123456,
+            )
+
+            self.assertEqual(("Dima", "Ivanov", 1234), holder)
+
+    def test_get_current_key_holder_returns_none_when_telegram_user_is_not_holder(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    123456,
+                    "Ivanov",
+                    1234,
+                )
+                create_key(connection, holder_id)
+
+            holder = get_current_key_holder(
+                database_path,
+                telegram_user_id=654321,
+            )
+
+            self.assertIsNone(holder)
+
+    def test_get_gym_member_id_by_telegram_user_id_returns_member_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                member_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    123456,
+                    "Ivanov",
+                    1234,
+                )
+
+            found_member_id = get_gym_member_id_by_telegram_user_id(
+                database_path,
+                123456,
+            )
+
+            self.assertEqual(member_id, found_member_id)
+
+    def test_get_gym_member_id_by_telegram_user_id_returns_none_when_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            member_id = get_gym_member_id_by_telegram_user_id(
+                database_path,
+                123456,
+            )
+
+            self.assertIsNone(member_id)
 
 
 if __name__ == "__main__":

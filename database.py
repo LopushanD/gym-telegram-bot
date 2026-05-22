@@ -104,19 +104,46 @@ def on_holder_change(database_path, key_id, new_holder_id):
     connection.close()
 
 
-def get_current_key_holder(database_path=DEFAULT_DATABASE_PATH, key_id=1):
+def get_current_key_holder(
+    database_path=DEFAULT_DATABASE_PATH,
+    key_id=1,
+    telegram_user_id=None,
+):
     """Return the current holder details for a key, or None if the key is missing."""
+    query = """
+        SELECT gym_members.name, gym_members.surname, gym_members.room_number
+        FROM keys
+        JOIN gym_members ON gym_members.id = keys.current_holder_id
+        WHERE keys.id = ?
+    """
+    parameters = [key_id]
+
+    if telegram_user_id is not None:
+        query += " AND gym_members.telegram_user_id = ?"
+        parameters.append(telegram_user_id)
+
     with sqlite3.connect(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
-        return connection.execute(
+        return connection.execute(query, parameters).fetchone()
+
+
+def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
+    """Return the gym member id for a Telegram user, or None if absent."""
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        member = connection.execute(
             """
-            SELECT gym_members.name, gym_members.surname, gym_members.room_number
-            FROM keys
-            JOIN gym_members ON gym_members.id = keys.current_holder_id
-            WHERE keys.id = ?
+            SELECT id
+            FROM gym_members
+            WHERE telegram_user_id = ?
             """,
-            (key_id,),
+            (telegram_user_id,),
         ).fetchone()
+
+    if member is None:
+        return None
+
+    return member[0]
 
 
 def populate_members_table_with_mock_data(
