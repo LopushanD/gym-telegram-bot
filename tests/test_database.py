@@ -8,7 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from database import (
+from src.database import (
     get_current_key_holder,
     get_gym_member_id_by_telegram_user_id,
     initialize_database,

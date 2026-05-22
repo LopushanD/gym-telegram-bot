@@ -9,8 +9,9 @@ from unittest.mock import AsyncMock, patch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import testBot
-from database import initialize_database
+import src.bot as bot
+from src.database import initialize_database
+from src.key_service import ConfirmKeyResult, ConfirmKeyStatus, HandoverResult, HandoverStatus
 
 
 def create_callback_update(callback_data, telegram_user_id=None):
@@ -41,14 +42,14 @@ def assert_reply_text_with_start_keyboard(
     test_case.assertEqual((expected_text,), args)
     if includes_holder_actions:
         test_case.assertEqual("Hand over the key", keyboard[0][0].text)
-        test_case.assertEqual(testBot.KEY_HANDOVER_CALLBACK, keyboard[0][0].callback_data)
+        test_case.assertEqual(bot.KEY_HANDOVER_CALLBACK, keyboard[0][0].callback_data)
         test_case.assertEqual(1, len(keyboard))
         return
 
     test_case.assertEqual("Request the key", keyboard[0][0].text)
-    test_case.assertEqual(testBot.KEY_REQUEST_CALLBACK, keyboard[0][0].callback_data)
+    test_case.assertEqual(bot.KEY_REQUEST_CALLBACK, keyboard[0][0].callback_data)
     test_case.assertEqual("Got the key", keyboard[1][0].text)
-    test_case.assertEqual(testBot.KEY_OBTAINED_CALLBACK, keyboard[1][0].callback_data)
+    test_case.assertEqual(bot.KEY_OBTAINED_CALLBACK, keyboard[1][0].callback_data)
     test_case.assertEqual(2, len(keyboard))
 
 
@@ -68,53 +69,53 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
     async def test_reply_with_start_state_sends_main_keyboard(self):
         message = SimpleNamespace(reply_text=AsyncMock())
 
-        await testBot.reply_with_start_state(message)
+        await bot.reply_with_start_state(message)
 
         assert_reply_text_with_start_keyboard(
             self,
             message.reply_text,
-            testBot.START_STATE_TEXT,
+            bot.START_STATE_TEXT,
         )
 
     async def test_reply_with_start_state_adds_holder_action_for_current_holder(self):
         message = SimpleNamespace(reply_text=AsyncMock())
 
         with patch.object(
-            testBot,
-            "get_current_key_holder",
-            return_value=("Dima", "Ivanov", 1234),
-        ) as get_current_holder:
-            await testBot.reply_with_start_state(
+            bot,
+            "user_currently_holds_key",
+            return_value=True,
+        ) as user_currently_holds_key:
+            await bot.reply_with_start_state(
                 message,
                 telegram_user_id=123,
             )
 
-        get_current_holder.assert_called_once_with(
-            testBot.DEFAULT_DATABASE_PATH,
-            key_id=testBot.DEFAULT_KEY_ID,
-            telegram_user_id=123,
+        user_currently_holds_key.assert_called_once_with(
+            bot.DEFAULT_DATABASE_PATH,
+            123,
+            bot.DEFAULT_KEY_ID,
         )
         assert_reply_text_with_start_keyboard(
             self,
             message.reply_text,
-            testBot.START_STATE_TEXT,
+            bot.START_STATE_TEXT,
             includes_holder_actions=True,
         )
         assert_keyboard_does_not_include_callback(
             self,
             message.reply_text,
-            testBot.KEY_OBTAINED_CALLBACK,
+            bot.KEY_OBTAINED_CALLBACK,
         )
 
     async def test_reply_with_start_state_keeps_default_buttons_for_non_holder(self):
         message = SimpleNamespace(reply_text=AsyncMock())
 
         with patch.object(
-            testBot,
-            "get_current_key_holder",
-            return_value=None,
+            bot,
+            "user_currently_holds_key",
+            return_value=False,
         ):
-            await testBot.reply_with_start_state(
+            await bot.reply_with_start_state(
                 message,
                 telegram_user_id=456,
             )
@@ -122,7 +123,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_reply_text_with_start_keyboard(
             self,
             message.reply_text,
-            testBot.START_STATE_TEXT,
+            bot.START_STATE_TEXT,
         )
 
     async def test_start_command_returns_to_start_state(self):
@@ -132,33 +133,33 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(
-            testBot,
-            "get_current_key_holder",
-            return_value=("Dima", "Ivanov", 1234),
+            bot,
+            "user_currently_holds_key",
+            return_value=True,
         ):
-            await testBot.start_state_command_handler(update, SimpleNamespace())
+            await bot.start_state_command_handler(update, SimpleNamespace())
 
         assert_reply_text_with_start_keyboard(
             self,
             update.message.reply_text,
-            testBot.START_STATE_TEXT,
+            bot.START_STATE_TEXT,
             includes_holder_actions=True,
         )
         assert_keyboard_does_not_include_callback(
             self,
             update.message.reply_text,
-            testBot.KEY_OBTAINED_CALLBACK,
+            bot.KEY_OBTAINED_CALLBACK,
         )
 
     async def test_request_key_callback_replies_with_current_holder(self):
-        update = create_callback_update(testBot.KEY_REQUEST_CALLBACK)
+        update = create_callback_update(bot.KEY_REQUEST_CALLBACK)
 
         with patch.object(
-            testBot,
-            "get_current_key_holder",
-            return_value=("Dima", "Ivanov", 1234),
+            bot,
+            "get_key_holder",
+            return_value=SimpleNamespace(name="Dima", surname="Ivanov", room_number=1234),
         ):
-            await testBot.request_key_handler(update, SimpleNamespace())
+            await bot.callback_query_handler(update, SimpleNamespace())
 
         update.callback_query.answer.assert_awaited_once_with("Looking up the key holder...")
         update.callback_query.message.delete.assert_awaited_once_with()
@@ -169,10 +170,10 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_request_key_callback_replies_when_key_is_missing(self):
-        update = create_callback_update(testBot.KEY_REQUEST_CALLBACK)
+        update = create_callback_update(bot.KEY_REQUEST_CALLBACK)
 
-        with patch.object(testBot, "get_current_key_holder", return_value=None):
-            await testBot.request_key_handler(update, SimpleNamespace())
+        with patch.object(bot, "get_key_holder", return_value=None):
+            await bot.callback_query_handler(update, SimpleNamespace())
 
         update.callback_query.answer.assert_awaited_once_with("Looking up the key holder...")
         update.callback_query.message.delete.assert_awaited_once_with()
@@ -183,9 +184,9 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_got_key_callback_asks_for_confirmation(self):
-        update = create_callback_update(testBot.KEY_OBTAINED_CALLBACK)
+        update = create_callback_update(bot.KEY_OBTAINED_CALLBACK)
 
-        await testBot.request_key_handler(update, SimpleNamespace())
+        await bot.callback_query_handler(update, SimpleNamespace())
 
         update.callback_query.answer.assert_awaited_once_with("Please confirm.")
         update.callback_query.message.delete.assert_awaited_once_with()
@@ -195,24 +196,23 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(("Please confirm that you got the key.",), args)
         self.assertEqual("Confirm", keyboard[0][0].text)
-        self.assertEqual(testBot.CONFIRM_KEY_OBTAINED_CALLBACK, keyboard[0][0].callback_data)
+        self.assertEqual(bot.CONFIRM_KEY_OBTAINED_CALLBACK, keyboard[0][0].callback_data)
         self.assertEqual("Cancel", keyboard[0][1].text)
-        self.assertEqual(testBot.CANCEL_KEY_OBTAINED_CALLBACK, keyboard[0][1].callback_data)
+        self.assertEqual(bot.CANCEL_KEY_OBTAINED_CALLBACK, keyboard[0][1].callback_data)
 
     async def test_key_handover_callback_gives_current_holder_instructions(self):
-        update = create_callback_update(testBot.KEY_HANDOVER_CALLBACK, telegram_user_id=123)
+        update = create_callback_update(bot.KEY_HANDOVER_CALLBACK, telegram_user_id=123)
 
         with (
             patch.object(
-                testBot,
-                "get_current_key_holder",
-                return_value=("Dima", "Ivanov", 1234),
+                bot,
+                "start_key_handover",
+                return_value=HandoverResult(status=HandoverStatus.READY),
             ),
-            patch.object(testBot, "on_holder_change") as on_holder_change,
+            patch.object(bot, "user_currently_holds_key", return_value=True),
         ):
-            await testBot.request_key_handler(update, SimpleNamespace())
+            await bot.callback_query_handler(update, SimpleNamespace())
 
-        on_holder_change.assert_not_called()
         update.callback_query.answer.assert_awaited_once_with("Ready for handover.")
         update.callback_query.message.delete.assert_awaited_once_with()
         assert_reply_text_with_start_keyboard(
@@ -224,19 +224,22 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             update.callback_query.message.reply_text,
-            testBot.KEY_OBTAINED_CALLBACK,
+            bot.KEY_OBTAINED_CALLBACK,
         )
 
     async def test_key_handover_callback_rejects_non_holder(self):
-        update = create_callback_update(testBot.KEY_HANDOVER_CALLBACK, telegram_user_id=456)
+        update = create_callback_update(bot.KEY_HANDOVER_CALLBACK, telegram_user_id=456)
 
         with (
-            patch.object(testBot, "get_current_key_holder", return_value=None),
-            patch.object(testBot, "on_holder_change") as on_holder_change,
+            patch.object(
+                bot,
+                "start_key_handover",
+                return_value=HandoverResult(status=HandoverStatus.NOT_CURRENT_HOLDER),
+            ),
+            patch.object(bot, "user_currently_holds_key", return_value=False),
         ):
-            await testBot.request_key_handler(update, SimpleNamespace())
+            await bot.callback_query_handler(update, SimpleNamespace())
 
-        on_holder_change.assert_not_called()
         update.callback_query.answer.assert_awaited_once_with(
             "Only the current holder can hand over the key."
         )
@@ -249,30 +252,28 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_confirm_key_obtained_callback_updates_holder_and_history(self):
         update = create_callback_update(
-            testBot.CONFIRM_KEY_OBTAINED_CALLBACK,
+            bot.CONFIRM_KEY_OBTAINED_CALLBACK,
             telegram_user_id=123,
         )
 
         with (
             patch.object(
-                testBot,
-                "get_gym_member_id_by_telegram_user_id",
-                return_value=42,
-            ) as get_member_id,
-            patch.object(testBot, "on_holder_change") as on_holder_change,
+                bot,
+                "confirm_key_obtained",
+                return_value=ConfirmKeyResult(status=ConfirmKeyStatus.CONFIRMED),
+            ) as confirm_key_obtained,
             patch.object(
-                testBot,
-                "get_current_key_holder",
-                return_value=("Dima", "Ivanov", 1234),
+                bot,
+                "user_currently_holds_key",
+                return_value=True,
             ),
         ):
-            await testBot.request_key_handler(update, SimpleNamespace())
+            await bot.callback_query_handler(update, SimpleNamespace())
 
-        get_member_id.assert_called_once_with(testBot.DEFAULT_DATABASE_PATH, 123)
-        on_holder_change.assert_called_once_with(
-            testBot.DEFAULT_DATABASE_PATH,
-            testBot.DEFAULT_KEY_ID,
-            42,
+        confirm_key_obtained.assert_called_once_with(
+            bot.DEFAULT_DATABASE_PATH,
+            123,
+            bot.DEFAULT_KEY_ID,
         )
 
         update.callback_query.answer.assert_awaited_once_with("Confirmed.")
@@ -286,7 +287,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             update.callback_query.message.reply_text,
-            testBot.KEY_OBTAINED_CALLBACK,
+            bot.KEY_OBTAINED_CALLBACK,
         )
 
     async def test_confirm_key_obtained_callback_updates_database(self):
@@ -327,12 +328,12 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
                 ).lastrowid
 
             update = create_callback_update(
-                testBot.CONFIRM_KEY_OBTAINED_CALLBACK,
+                bot.CONFIRM_KEY_OBTAINED_CALLBACK,
                 telegram_user_id=222,
             )
 
-            with patch.object(testBot, "DEFAULT_DATABASE_PATH", database_path):
-                await testBot.request_key_handler(update, SimpleNamespace())
+            with patch.object(bot, "DEFAULT_DATABASE_PATH", database_path):
+                await bot.callback_query_handler(update, SimpleNamespace())
 
             with sqlite3.connect(database_path) as connection:
                 current_holder_id = connection.execute(
@@ -359,16 +360,26 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             assert_keyboard_does_not_include_callback(
                 self,
                 update.callback_query.message.reply_text,
-                testBot.KEY_OBTAINED_CALLBACK,
+                bot.KEY_OBTAINED_CALLBACK,
             )
 
     async def test_confirm_key_obtained_callback_rejects_missing_telegram_user(self):
-        update = create_callback_update(testBot.CONFIRM_KEY_OBTAINED_CALLBACK)
+        update = create_callback_update(bot.CONFIRM_KEY_OBTAINED_CALLBACK)
 
-        with patch.object(testBot, "on_holder_change") as on_holder_change:
-            await testBot.request_key_handler(update, SimpleNamespace())
+        with patch.object(
+            bot,
+            "confirm_key_obtained",
+            return_value=ConfirmKeyResult(
+                status=ConfirmKeyStatus.MISSING_TELEGRAM_USER,
+            ),
+        ) as confirm_key_obtained:
+            await bot.callback_query_handler(update, SimpleNamespace())
 
-        on_holder_change.assert_not_called()
+        confirm_key_obtained.assert_called_once_with(
+            bot.DEFAULT_DATABASE_PATH,
+            None,
+            bot.DEFAULT_KEY_ID,
+        )
         update.callback_query.answer.assert_awaited_once_with("Could not identify you.")
         update.callback_query.message.delete.assert_awaited_once_with()
         assert_reply_text_with_start_keyboard(
@@ -379,23 +390,27 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_confirm_key_obtained_callback_rejects_unregistered_user(self):
         update = create_callback_update(
-            testBot.CONFIRM_KEY_OBTAINED_CALLBACK,
+            bot.CONFIRM_KEY_OBTAINED_CALLBACK,
             telegram_user_id=123,
         )
 
         with (
             patch.object(
-                testBot,
-                "get_gym_member_id_by_telegram_user_id",
-                return_value=None,
-            ) as get_member_id,
-            patch.object(testBot, "on_holder_change") as on_holder_change,
-            patch.object(testBot, "get_current_key_holder", return_value=None),
+                bot,
+                "confirm_key_obtained",
+                return_value=ConfirmKeyResult(
+                    status=ConfirmKeyStatus.USER_NOT_REGISTERED,
+                ),
+            ) as confirm_key_obtained,
+            patch.object(bot, "user_currently_holds_key", return_value=False),
         ):
-            await testBot.request_key_handler(update, SimpleNamespace())
+            await bot.callback_query_handler(update, SimpleNamespace())
 
-        get_member_id.assert_called_once_with(testBot.DEFAULT_DATABASE_PATH, 123)
-        on_holder_change.assert_not_called()
+        confirm_key_obtained.assert_called_once_with(
+            bot.DEFAULT_DATABASE_PATH,
+            123,
+            bot.DEFAULT_KEY_ID,
+        )
         update.callback_query.answer.assert_awaited_once_with("You are not registered.")
         update.callback_query.message.delete.assert_awaited_once_with()
         assert_reply_text_with_start_keyboard(
@@ -405,9 +420,9 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_cancel_key_obtained_callback_replies_with_cancellation(self):
-        update = create_callback_update(testBot.CANCEL_KEY_OBTAINED_CALLBACK)
+        update = create_callback_update(bot.CANCEL_KEY_OBTAINED_CALLBACK)
 
-        await testBot.request_key_handler(update, SimpleNamespace())
+        await bot.callback_query_handler(update, SimpleNamespace())
 
         update.callback_query.answer.assert_awaited_once_with("Cancelled.")
         update.callback_query.message.delete.assert_awaited_once_with()
@@ -420,7 +435,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_callback_returns_to_start_state(self):
         update = create_callback_update("unknown")
 
-        await testBot.request_key_handler(update, SimpleNamespace())
+        await bot.callback_query_handler(update, SimpleNamespace())
 
         update.callback_query.answer.assert_awaited_once_with("Unknown button.")
         update.callback_query.message.delete.assert_awaited_once_with()
@@ -434,11 +449,11 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         update = create_callback_update("unknown", telegram_user_id=123)
 
         with patch.object(
-            testBot,
-            "get_current_key_holder",
-            return_value=("Dima", "Ivanov", 1234),
+            bot,
+            "user_currently_holds_key",
+            return_value=True,
         ):
-            await testBot.request_key_handler(update, SimpleNamespace())
+            await bot.callback_query_handler(update, SimpleNamespace())
 
         assert_reply_text_with_start_keyboard(
             self,
@@ -449,7 +464,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             update.callback_query.message.reply_text,
-            testBot.KEY_OBTAINED_CALLBACK,
+            bot.KEY_OBTAINED_CALLBACK,
         )
 
 

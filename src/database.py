@@ -1,9 +1,8 @@
 import random
 import sqlite3
-from pathlib import Path
 
+from config import DEFAULT_DATABASE_PATH
 
-DEFAULT_DATABASE_PATH = Path("gym_bot.sqlite3")
 
 FIRST_NAMES = (
     "Alex",
@@ -67,6 +66,7 @@ def initialize_database(database_path=DEFAULT_DATABASE_PATH):
             """
         )
 
+
 def on_holder_change(database_path, key_id, new_holder_id):
     """Change a key holder and append the change to holder history."""
     with sqlite3.connect(database_path) as connection:
@@ -101,7 +101,6 @@ def on_holder_change(database_path, key_id, new_holder_id):
             """,
             (key_id, new_holder_id),
         )
-    connection.close()
 
 
 def get_current_key_holder(
@@ -149,7 +148,7 @@ def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
 def populate_members_table_with_mock_data(
     database_path=DEFAULT_DATABASE_PATH,
     n_members=5,
-    rng=None
+    rng=None,
 ):
     """Populate the members table with random plausible mock members."""
     if n_members < 0:
@@ -192,7 +191,6 @@ def populate_members_table_with_mock_data(
                 ),
             )
             inserted_member_ids.append(cursor.lastrowid)
-    connection.close()
 
     return inserted_member_ids
 
@@ -204,6 +202,7 @@ def _generate_unique_telegram_user_id(rng, used_telegram_user_ids):
             used_telegram_user_ids.add(telegram_user_id)
             return telegram_user_id
 
+
 if __name__ == "__main__":
     initialize_database()
-    populate_members_table_with_mock_data(DEFAULT_DATABASE_PATH,5)
+    populate_members_table_with_mock_data(DEFAULT_DATABASE_PATH, 5)
