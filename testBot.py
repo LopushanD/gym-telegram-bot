@@ -12,6 +12,7 @@ KEY_OBTAINED_CALLBACK: Final[str] = "key_obtained"
 CONFIRM_KEY_OBTAINED_CALLBACK: Final[str] = "confirm_key_obtained"
 CANCEL_KEY_OBTAINED_CALLBACK: Final[str] = "cancel_key_obtained"
 CallbackHandler = Callable[[CallbackQuery, Message], Awaitable[None]]
+START_STATE_TEXT: Final[str] = "Welcome! The buttons are ready."
 
 
 def build_keyboard() -> InlineKeyboardMarkup:
@@ -36,18 +37,18 @@ def build_key_obtained_confirmation_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def reply_with_start_state(message: Message, text: str = START_STATE_TEXT) -> None:
+    await message.reply_text(text, reply_markup=build_keyboard())
+
+
+async def start_state_command_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
     if update.message is None:
         return
 
-    await update.message.reply_text(
-        "Welcome! The buttons are ready.",
-        reply_markup=build_keyboard(),
-    )
-
-
-async def reply_with_start_state(message: Message, text: str) -> None:
-    await message.reply_text(text, reply_markup=build_keyboard())
+    await reply_with_start_state(update.message)
 
 
 async def request_key_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -132,7 +133,7 @@ def main() -> None:
     initialize_database(DEFAULT_DATABASE_PATH)
     application = Application.builder().token(token).concurrent_updates(True).read_timeout(30).write_timeout(30).build()
     
-    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("start", start_state_command_handler))
     application.add_handler(CallbackQueryHandler(request_key_handler))
     print("Telegram Bot started!", flush=True)
     application.run_polling()

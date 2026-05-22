@@ -33,19 +33,27 @@ def assert_reply_text_with_start_keyboard(test_case, reply_text_mock, expected_t
 
 
 class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
-    async def test_start_sends_main_keyboard(self):
+    async def test_reply_with_start_state_sends_main_keyboard(self):
+        message = SimpleNamespace(reply_text=AsyncMock())
+
+        await testBot.reply_with_start_state(message)
+
+        assert_reply_text_with_start_keyboard(
+            self,
+            message.reply_text,
+            testBot.START_STATE_TEXT,
+        )
+
+    async def test_start_command_returns_to_start_state(self):
         update = SimpleNamespace(message=SimpleNamespace(reply_text=AsyncMock()))
 
-        await testBot.start(update, SimpleNamespace())
+        await testBot.start_state_command_handler(update, SimpleNamespace())
 
-        update.message.reply_text.assert_awaited_once()
-        _, kwargs = update.message.reply_text.call_args
-        keyboard = kwargs["reply_markup"].inline_keyboard
-
-        self.assertEqual("Request the key", keyboard[0][0].text)
-        self.assertEqual(testBot.KEY_REQUEST_CALLBACK, keyboard[0][0].callback_data)
-        self.assertEqual("Got the key", keyboard[1][0].text)
-        self.assertEqual(testBot.KEY_OBTAINED_CALLBACK, keyboard[1][0].callback_data)
+        assert_reply_text_with_start_keyboard(
+            self,
+            update.message.reply_text,
+            testBot.START_STATE_TEXT,
+        )
 
     async def test_request_key_callback_replies_with_current_holder(self):
         update = create_callback_update(testBot.KEY_REQUEST_CALLBACK)
