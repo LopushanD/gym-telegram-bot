@@ -1,8 +1,10 @@
 import random
 import sqlite3
-
+import sys
+from pathlib import Path
+if __package__ is None or __package__ == "":
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import DEFAULT_DATABASE_PATH
-
 
 FIRST_NAMES = (
     "Alex",
@@ -25,8 +27,7 @@ SURNAMES = (
     "Weber",
 )
 
-
-def initialize_database(database_path=DEFAULT_DATABASE_PATH):
+def initialize_database(database_path):
     """Create the application database tables if they do not exist yet."""
     with sqlite3.connect(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
@@ -103,11 +104,7 @@ def change_key_holder(database_path, key_id, new_holder_id):
         )
 
 
-def get_current_key_holder(
-    database_path=DEFAULT_DATABASE_PATH,
-    key_id=1,
-    telegram_user_id=None,
-):
+def get_current_key_holder(database_path, key_id, telegram_user_id=None):
     """Return the current holder details for a key, or None if the key is missing."""
     query = """
         SELECT gym_members.name, gym_members.surname, gym_members.room_number
@@ -145,11 +142,7 @@ def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
     return member[0]
 
 
-def populate_members_table_with_mock_data(
-    database_path=DEFAULT_DATABASE_PATH,
-    n_members=5,
-    rng=None,
-):
+def populate_members_table_with_mock_data(database_path,n_members,rng=None):
     """Populate the members table with random plausible mock members."""
     if n_members < 0:
         raise ValueError("n_members must not be negative")
@@ -204,5 +197,5 @@ def _generate_unique_telegram_user_id(rng, used_telegram_user_ids):
 
 
 if __name__ == "__main__":
-    initialize_database()
-    populate_members_table_with_mock_data(DEFAULT_DATABASE_PATH, 5)
+    initialize_database(DEFAULT_DATABASE_PATH)
+    populate_members_table_with_mock_data(DEFAULT_DATABASE_PATH, 5,None)

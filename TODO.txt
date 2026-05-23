@@ -1,9 +1,13 @@
-IMPORTANT: seems like there's bug with the giving the key. It was implemented in the beginning, but as code grew it wasnt
-adjusted or removed. So, in fact you have changes to the database, just they work unreliably.
 
-- Try to make sense of the code, as it's kind of difficult to read.
-
+- Add possibility to cancel handing over for the holder of key
+- Add cancel of haning over due to technical reasons (like person is not in database)
 - For now getting the key is only between two members. So, rename the button to "got the key from member"
+
 - Add button "got the key from mailbox".
-- Now got the key button handlers only display messages, they do not change state of database.
-Implement the change to database.
+- On phone button animations take too much time, get rid of them.
+- when key is given over the name of new holder comes form telegram, but when "requesting"
+the key, message comes from database.
+example: "The key was handed over from Test to AJ" 
+        but
+        "The key is currently held by Alex Johnes, room 1111"
+So, think through if it's okay and how to change It

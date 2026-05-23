@@ -5,7 +5,6 @@ def get_update_user_id(update: Update) -> int | None:
     user = getattr(update, "effective_user", None)
     if user is None:
         return None
-
     return user.id
 
 
@@ -13,9 +12,7 @@ def get_callback_user_id(query: CallbackQuery) -> int | None:
     user = getattr(query, "from_user", None)
     if user is None:
         return None
-
     return user.id
-
 
 def get_callback_user_display_name(query: CallbackQuery) -> str:
     user = getattr(query, "from_user", None)
@@ -41,7 +38,6 @@ def get_message_chat_id(message: Message) -> int | None:
     chat_id = getattr(message, "chat_id", None)
     if chat_id is not None:
         return chat_id
-
     chat = getattr(message, "chat", None)
     return getattr(chat, "id", None)
 

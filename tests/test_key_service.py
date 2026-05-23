@@ -11,7 +11,7 @@ from src.key_service import (
     HandoverStatus,
     confirm_key_obtained,
     get_key_holder,
-    start_key_handover,
+    can_start_key_handover,
     user_currently_holds_key,
 )
 
@@ -57,13 +57,13 @@ class KeyServiceTests(unittest.TestCase):
 
     def test_start_key_handover_returns_ready_for_current_holder(self):
         with patch("src.key_service.user_currently_holds_key", return_value=True):
-            result = start_key_handover("database.sqlite3", 123, key_id=1)
+            result = can_start_key_handover("database.sqlite3", 123, key_id=1)
 
         self.assertEqual(HandoverStatus.READY, result.status)
 
     def test_start_key_handover_rejects_non_holder(self):
         with patch("src.key_service.user_currently_holds_key", return_value=False):
-            result = start_key_handover("database.sqlite3", 123, key_id=1)
+            result = can_start_key_handover("database.sqlite3", 123, key_id=1)
 
         self.assertEqual(HandoverStatus.NOT_CURRENT_HOLDER, result.status)
 

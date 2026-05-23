@@ -3,33 +3,27 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from telegram import CallbackQuery, Message
-
+from src.database import change_key_holder,get_gym_member_id_by_telegram_user_id
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
+from src.config import DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID,HANDOVER_WINDOW_SECONDS
 from src.keyboards import build_key_obtained_confirmation_keyboard
-from src.key_service import HandoverStatus, start_key_handover
+from src.key_service import HandoverStatus, user_currently_holds_key
 from src.telegram_helpers import (
     get_callback_user_display_name,
     get_callback_user_id,
-    messages_are_from_same_chat,
 )
 
-
 StartStateReply = Callable[[Message, str, int | None], Awaitable[None]]
-HANDOVER_WINDOW_SECONDS = 30
-
 
 @dataclass
 class PendingHandover:
     holder_user_id: int
     holder_display_name: str
     message: Message
-    send_start: StartStateReply
+    state_change_function: StartStateReply
     timeout_task: asyncio.Task[None]
 
-
 PENDING_HANDOVERS: dict[int, PendingHandover] = {}
-
 
 async def answer_with_start(
     query: CallbackQuery,
@@ -37,228 +31,141 @@ async def answer_with_start(
     message: Message,
     reply_text: str,
     telegram_user_id: int | None,
-    send_start: StartStateReply,
+    change_state_function: StartStateReply,
 ) -> None:
-    await query.answer(answer_text)
-    await send_start(message, reply_text, telegram_user_id)
+    await change_state_function(message, reply_text, telegram_user_id)
 
+def start_pending_handover(key_id,holder_user_id: int,holder_display_name: str,message: Message,state_change_function: StartStateReply) -> None:
+    if key_id in PENDING_HANDOVERS:
+        raise ValueError(f"handover is already pending for key: {key_id}")
 
-def start_pending_handover(
-    holder_user_id: int,
-    holder_display_name: str,
-    message: Message,
-    send_start: StartStateReply,
-) -> None:
-    if DEFAULT_KEY_ID in PENDING_HANDOVERS:
-        raise ValueError(f"handover is already pending for key: {DEFAULT_KEY_ID}")
-
-    timeout_task = asyncio.create_task(fail_pending_handover_after_timeout(DEFAULT_KEY_ID))
-    PENDING_HANDOVERS[DEFAULT_KEY_ID] = PendingHandover(
+    timeout_task = asyncio.create_task(fail_pending_handover_after_timeout(key_id))
+    PENDING_HANDOVERS[key_id] = PendingHandover(
         holder_user_id=holder_user_id,
         holder_display_name=holder_display_name,
         message=message,
-        send_start=send_start,
+        state_change_function=state_change_function,
         timeout_task=timeout_task,
     )
 
-
 async def fail_pending_handover_after_timeout(key_id: int) -> None:
     await asyncio.sleep(HANDOVER_WINDOW_SECONDS)
-    pending_handover = PENDING_HANDOVERS.pop(key_id, None)
-    if pending_handover is None:
-        return
+    try:
+        pending_handover = PENDING_HANDOVERS.pop(key_id)
+        await pending_handover.state_change_function(
+            pending_handover.message, messages.HANDOVER_FAILED_ANSWER,
+            pending_handover.holder_user_id,
+        )
+    except:
+        return #TODO: implement better handling
+        # think if it is possible to get timeout when there are no PENDING_HANDOVERS left
 
-    await pending_handover.send_start(
-        pending_handover.message, messages.HANDOVER_FAILED_TEXT,
-        pending_handover.holder_user_id,
-    )
-
-
-def complete_pending_handover(new_holder_user_id: int | None) -> PendingHandover | None:
-    pending_handover = PENDING_HANDOVERS.get(DEFAULT_KEY_ID)
-    if pending_handover is None:
-        return None
-
-    if new_holder_user_id == pending_handover.holder_user_id:
-        return pending_handover
-
-    PENDING_HANDOVERS.pop(DEFAULT_KEY_ID)
-    pending_handover.timeout_task.cancel()
-    return pending_handover
-
-
-def cancel_pending_handover() -> PendingHandover | None:
-    pending_handover = PENDING_HANDOVERS.pop(DEFAULT_KEY_ID, None)
+def get_pending_handover(key_id) -> PendingHandover | None:
+    pending_handover = PENDING_HANDOVERS.get(key_id)
     if pending_handover is None:
         return None
-
-    pending_handover.timeout_task.cancel()
     return pending_handover
 
-
-async def handle_key_handover(
-    query: CallbackQuery,
-    message: Message,
-    send_start: StartStateReply,
-) -> None:
+async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> None:
     telegram_user_id = get_callback_user_id(query)
-    result = start_key_handover(DEFAULT_DATABASE_PATH, telegram_user_id, DEFAULT_KEY_ID)
-
-    if result.status == HandoverStatus.NOT_CURRENT_HOLDER or telegram_user_id is None:
-        await answer_with_start(
-            query,
-            messages.HANDOVER_NOT_ALLOWED_ANSWER,
-            message,
-            messages.HANDOVER_NOT_ALLOWED_TEXT,
+    if not user_currently_holds_key(DEFAULT_DATABASE_PATH, telegram_user_id, key_id):
+        reply = messages.HANDOVER_NOT_ALLOWED_ANSWER
+    elif key_id in PENDING_HANDOVERS:
+        reply = messages.HANDOVER_ALREADY_PENDING_ANSWER
+    else:
+        start_pending_handover(
+            key_id,
             telegram_user_id,
-            send_start,
-        )
-        return
-
-    if DEFAULT_KEY_ID in PENDING_HANDOVERS:
-        await answer_with_start(
-            query,
-            messages.HANDOVER_ALREADY_PENDING_ANSWER,
+            get_callback_user_display_name(query),
             message,
-            messages.HANDOVER_ALREADY_PENDING_TEXT,
-            telegram_user_id,
-            send_start,
+            state_change_function
         )
-        return
-
-    start_pending_handover(
-        telegram_user_id,
-        get_callback_user_display_name(query),
-        message,
-        send_start,
-    )
+        # If reached this point, everything went successfully
+        reply = messages.HANDOVER_READY_ANSWER
     await answer_with_start(
         query,
-        messages.HANDOVER_READY_ANSWER,
+        reply,
         message,
-        messages.HANDOVER_READY_TEXT,
+        reply,
         telegram_user_id,
-        send_start,
+        state_change_function
     )
 
-
-async def handle_pending_handover_obtained(
-    query: CallbackQuery,
-    message: Message,
-    send_start: StartStateReply,
-) -> bool:
-    pending_handover = PENDING_HANDOVERS.get(DEFAULT_KEY_ID)
-    if pending_handover is None:
-        return False
-
+async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> bool:
+    pending_handover = PENDING_HANDOVERS.get(key_id)
     telegram_user_id = get_callback_user_id(query)
+    reply = None
     if telegram_user_id is None:
-        await answer_with_start(
-            query, messages.MISSING_TELEGRAM_USER_ANSWER, message, messages.MISSING_TELEGRAM_USER_TEXT,
-            None, send_start,
+        reply = messages.MISSING_TELEGRAM_USER_ANSWER
+    elif pending_handover is None:
+        reply = messages.HANDOVER_NO_PENDING_ANSWER  
+    elif telegram_user_id == pending_handover.holder_user_id:
+        reply = messages.HANDOVER_SELF_CONFIRMATION_ANSWER
+    if reply is not None:
+        await answer_with_start(query, reply, message,reply, telegram_user_id, state_change_function)
+    else:
+        await query.answer(messages.PLEASE_CONFIRM_KEY_OBTAINED)
+        prompt = messages.HANDOVER_CONFIRMATION_PROMPT.format(
+            from_member=pending_handover.holder_display_name,
         )
-        return True
-
-    if telegram_user_id == pending_handover.holder_user_id:
-        await answer_with_start(
-            query, messages.HANDOVER_SELF_CONFIRMATION_ANSWER, message,
-            messages.HANDOVER_SELF_CONFIRMATION_TEXT, telegram_user_id, send_start,
+        await message.reply_text(
+            prompt,
+            reply_markup=build_key_obtained_confirmation_keyboard(),
         )
-        return True
 
-    await query.answer(messages.PLEASE_CONFIRM_KEY_OBTAINED)
-    prompt = messages.HANDOVER_CONFIRMATION_PROMPT.format(
-        from_member=pending_handover.holder_display_name,
-    )
-    await message.reply_text(
-        prompt,
-        reply_markup=build_key_obtained_confirmation_keyboard(),
-    )
-    return True
-
-
-async def handle_pending_handover_confirmation(
-    query: CallbackQuery,
-    message: Message,
-    send_start: StartStateReply,
-) -> bool:
+async def handle_pending_handover_confirmation(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> bool:
     telegram_user_id = get_callback_user_id(query)
-    if telegram_user_id is None:
-        if DEFAULT_KEY_ID not in PENDING_HANDOVERS:
-            return False
-        await answer_with_start(
-            query, messages.MISSING_TELEGRAM_USER_ANSWER, message, messages.MISSING_TELEGRAM_USER_TEXT,
-            None, send_start,
-        )
-        return True
-
-    pending_handover = complete_pending_handover(telegram_user_id)
+    reply = None
+    member_id = None
+    pending_handover = get_pending_handover(key_id)
     if pending_handover is None:
-        return False
-
-    if telegram_user_id == pending_handover.holder_user_id:
+        reply = messages.HANDOVER_NO_PENDING_ANSWER
+    elif telegram_user_id is None:
+        reply = messages.MISSING_TELEGRAM_USER_ANSWER
+    else:
+        if telegram_user_id == pending_handover.holder_user_id:
+            reply = messages.HANDOVER_SELF_CONFIRMATION_ANSWER
+        else:
+            member_id = get_gym_member_id_by_telegram_user_id(DEFAULT_DATABASE_PATH,telegram_user_id)
+            if member_id is None:
+                reply = messages.UNREGISTERED_USER_ANSWER
+    if reply is not None:
         await answer_with_start(
-            query, messages.HANDOVER_SELF_CONFIRMATION_ANSWER, message,
-            messages.HANDOVER_SELF_CONFIRMATION_TEXT, telegram_user_id, send_start,
-        )
-        return True
-
-    await complete_handover_interaction(
-        query, message, telegram_user_id, pending_handover, send_start,
-    )
-    return True
-
+            query, reply, message,reply, telegram_user_id, state_change_function)
+    else:
+        await complete_handover_interaction(member_id,key_id,query, pending_handover)
 
 async def complete_handover_interaction(
+    member_id,
+    key_id:int,
     query: CallbackQuery,
-    message: Message,
-    new_holder_user_id: int,
     pending_handover: PendingHandover,
-    send_start: StartStateReply,
 ) -> None:
-    handover_text = messages.HANDOVER_COMPLETED_TEXT.format(
+    change_key_holder(DEFAULT_DATABASE_PATH,key_id,member_id)
+    PENDING_HANDOVERS.pop(key_id)
+    pending_handover.timeout_task.cancel()
+    handover_text = messages.HANDOVER_COMPLETED_ANSWER.format(
         from_member=pending_handover.holder_display_name,
         to_member=get_callback_user_display_name(query),
     )
-    await query.answer(messages.HANDOVER_COMPLETED_ANSWER)
-    await pending_handover.send_start(
+    # answered in bot -> await query.answer(messages.HANDOVER_COMPLETED_ANSWER)
+    await pending_handover.state_change_function(
         pending_handover.message, handover_text, pending_handover.holder_user_id,
     )
-    if messages_are_from_same_chat(pending_handover.message, message):
-        return
-
-    await send_start(message, handover_text, new_holder_user_id)
-
-
-async def handle_pending_handover_cancellation(
-    query: CallbackQuery,
-    message: Message,
-    send_start: StartStateReply,
-) -> bool:
-    pending_handover = cancel_pending_handover()
-    if pending_handover is None:
-        return False
-
-    await query.answer(messages.KEY_OBTAINED_CANCELLED_ANSWER)
-    await notify_handover_cancelled(
-        pending_handover, message, get_callback_user_id(query), send_start,
+    await pending_handover.state_change_function(
+        query.message, handover_text, get_callback_user_id(query)
     )
-    return True
+    
 
-
-async def notify_handover_cancelled(
-    pending_handover: PendingHandover,
-    cancellation_message: Message,
-    cancelling_user_id: int | None,
-    send_start: StartStateReply,
-) -> None:
-    await pending_handover.send_start(
-        pending_handover.message, messages.HANDOVER_FAILED_TEXT,
-        pending_handover.holder_user_id,
-    )
-    if messages_are_from_same_chat(pending_handover.message, cancellation_message):
-        return
-
-    await send_start(
-        cancellation_message, messages.KEY_OBTAINED_CANCELLED_TEXT, cancelling_user_id,
-    )
+#TODO: implement for handing side
+# async def handle_pending_handover_cancellation(
+#     query: CallbackQuery,
+#     message: Message,
+#     state_change_function: StartStateReply,
+# ) -> None:
+#     pending_handover = get_pending_handover(DEFAULT_KEY_ID)
+#     reply = messages.KEY_OBTAINED_CANCELLED_ANSWER
+#     pending_handover.timeout_task.cancel()
+#     PENDING_HANDOVERS.pop(DEFAULT_KEY_ID,None)
+#     await answer_with_start(
+#             query, reply, message,reply, None, state_change_function)
