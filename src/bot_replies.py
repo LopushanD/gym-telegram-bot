@@ -26,7 +26,6 @@ async def reply_with_start_state(
         reply_markup=build_start_state_markup(telegram_user_id),
     )
 
-
 async def edit_to_start_state(
     message: Message,
     text: str = messages.START_STATE_TEXT,
@@ -36,18 +35,6 @@ async def edit_to_start_state(
         text,
         reply_markup=build_start_state_markup(telegram_user_id),
     )
-
-
-# async def reply_with_holder_handover_cancel(
-#     message: Message,
-#     text: str = messages.START_STATE_TEXT,
-#     telegram_user_id: int | None = None,
-# ) -> None:
-#     await message.reply_text(
-#         text,
-#         reply_markup=build_key_handover_holder_keyboard(),
-#     )
-
 
 async def edit_to_holder_handover_cancel(
     message: Message,

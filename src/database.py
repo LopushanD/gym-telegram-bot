@@ -103,8 +103,8 @@ def change_key_holder(database_path, key_id, new_holder_id):
             (key_id, new_holder_id),
         )
 
-
-def get_current_key_holder(database_path, key_id, telegram_user_id=None):
+def get_current_key_holder_info(database_path, key_id, telegram_user_id=None,
+                                gym_member_id=None):
     """Return the current holder details for a key, or None if the key is missing."""
     query = """
         SELECT gym_members.name, gym_members.surname, gym_members.room_number
@@ -118,10 +118,13 @@ def get_current_key_holder(database_path, key_id, telegram_user_id=None):
         query += " AND gym_members.telegram_user_id = ?"
         parameters.append(telegram_user_id)
 
+    if gym_member_id is not None:
+        query += " AND gym_members.id = ?"
+        parameters.append(gym_member_id)
+
     with sqlite3.connect(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection.execute(query, parameters).fetchone()
-
 
 def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
     """Return the gym member id for a Telegram user, or None if absent."""

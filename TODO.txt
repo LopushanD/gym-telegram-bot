@@ -1,9 +1,5 @@
-- When you hand over the key. message doesn't get deleted and you now have two messages.
-- Add cancel of haning over due to technical reasons (like person is not in database)
-- For now getting the key is only between two members. So, rename the button to "got the key from member"
-
-- Add button "got the key from mailbox".
-- On phone button animations take too much time, get rid of them.
+- Simplify confirmation messages, so that there's no custom message for each confirmation
+- Think about better messages. Current ones are somewhat inconsistenct and might be missleading
 - when key is given over the name of new holder comes form telegram, but when "requesting"
 the key, message comes from database.
 example: "The key was handed over from Test to AJ" 
