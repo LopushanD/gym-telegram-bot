@@ -22,7 +22,7 @@ from src.keyboards import (
     RECEIVER_MAILBOX_KEY_OBTAINED_CALLBACK,
     build_key_return_mailbox_confirmation_keyboard,
 )
-from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
+from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID,MAILBOX_MEMBER_ID
 from src.database import initialize_database
 from src.handover_flow import (
     handle_key_handover,
@@ -92,13 +92,13 @@ async def handle_key_obtained_cancellation(query: CallbackQuery,message: Message
     await edit_to_start_state(query.message,messages.START_STATE_TEXT,query.from_user.id)
 
 async def handle_unknown_callback(query: CallbackQuery, message: Message) -> None:
-    await query.answer(UNKNOWN_CALLBACK_ANSWER)
+    await query.answer()
     await edit_to_start_state(message,UNKNOWN_CALLBACK_ANSWER,
                                  telegram_user_id=get_callback_user_id(query)
     )
     
 async def handle_holder_key_handover_cancellation(query: CallbackQuery, message: Message):
-  await query.answer(KEY_OBTAINED_CANCELLED_ANSWER)
+  await query.answer()
   await handle_pending_handover_cancellation(DEFAULT_KEY_ID,query,message)
 
 async def handle_key_return_mailbox(query: CallbackQuery, message: Message) -> None:
@@ -114,7 +114,7 @@ async def handle_key_return_mailbox_confirmation(query: CallbackQuery,message: M
         reply = messages.KEY_RETURNED_TO_MAILBOX_ANSWER
     else:
         reply = messages.KEY_RETURN_MAILBOX_NOT_ALLOWED_ANSWER
-    await query.answer(reply)
+    await query.answer()
     await edit_to_start_state(message,reply,telegram_user_id)
 
 async def handle_key_return_mailbox_cancellation(query: CallbackQuery,message: Message) -> None:
@@ -124,14 +124,14 @@ async def handle_key_return_mailbox_cancellation(query: CallbackQuery,message: M
 
 async def handle_key_obtained_from_mailbox(query: CallbackQuery,message: Message) -> None:
     telegram_user_id = get_callback_user_id(query)
-    result = take_key_from_mailbox(DEFAULT_DATABASE_PATH,telegram_user_id,DEFAULT_KEY_ID)
+    result = take_key_from_mailbox(DEFAULT_DATABASE_PATH,telegram_user_id,DEFAULT_KEY_ID,MAILBOX_MEMBER_ID)
     if result.status == TakeFromMailboxStatus.TAKEN:
         reply = messages.KEY_TAKEN_FROM_MAILBOX_ANSWER
     elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
         reply = messages.KEY_NOT_IN_MAILBOX_ANSWER
     else:
         reply = messages.UNREGISTERED_USER_ANSWER
-    await query.answer(reply)
+    await query.answer()
     await edit_to_start_state(message, reply, telegram_user_id)
 
 CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
