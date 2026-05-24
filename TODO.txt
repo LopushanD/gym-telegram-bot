@@ -1,7 +1,3 @@
-- For now getting the key is only between two members. So, rename the button to "got the key from member"
-
-- Add button "got the key from mailbox".
-- Add cancel of haning over due to technical reasons (like person is not in database)
 - when key is given over the name of new holder comes form telegram, but when "requesting"
 the key, message comes from database.
 example: "The key was handed over from Test to AJ" 

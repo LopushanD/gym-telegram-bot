@@ -10,6 +10,8 @@ KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK: Final[str] = "handover_receiver_con
 RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK: Final[str] = "handover_receiver_cancel_key_obtained"
 HOLDER_KEY_HANDOVER_CANCEL_CALLBACK: Final[str] = "handover_holder_cancel_key_obtained"
 HOLDER_KEY_RETURN_MAILBOX_CALLBACK: Final[str] = "holder_key_return_mailbox"
+HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK: Final[str] = "holder_key_return_mailbox_confirm"
+HOLDER_KEY_RETURN_MAILBOX_CANCEL_CALLBACK: Final[str] = "holder_key_return_mailbox_cancel"
 
 def build_start_keyboard(include_holder_actions: bool = False) -> InlineKeyboardMarkup:
     if include_holder_actions:
@@ -50,6 +52,15 @@ def build_key_obtained_receiver_confirmation_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("Confirm", callback_data=KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK),
             InlineKeyboardButton("Cancel", callback_data=RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK),
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def build_key_return_mailbox_confirmation_keyboard() -> InlineKeyboardMarkup:
+    keyboard = [
+        [
+            InlineKeyboardButton("Confirm", callback_data=HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK),
+            InlineKeyboardButton("Cancel", callback_data=HOLDER_KEY_RETURN_MAILBOX_CANCEL_CALLBACK),
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
