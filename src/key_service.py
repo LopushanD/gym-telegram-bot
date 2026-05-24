@@ -4,7 +4,8 @@ from enum import Enum
 from src.config import MAILBOX_MEMBER_ID
 from src.database import (
     change_key_holder,
-    get_current_key_holder,
+    get_current_key_holder_info,
+    get_gym_member_id_by_telegram_user_id,
 )
 
 @dataclass(frozen=True)
@@ -23,6 +24,12 @@ class ReturnToMailboxStatus(Enum):
     NOT_CURRENT_HOLDER = "not_current_holder"
 
 
+class TakeFromMailboxStatus(Enum):
+    TAKEN = "taken"
+    KEY_NOT_IN_MAILBOX = "key_not_in_mailbox"
+    USER_NOT_REGISTERED = "user_not_registered"
+
+
 @dataclass(frozen=True)
 class HandoverResult:
     status: HandoverStatus
@@ -33,18 +40,22 @@ class ReturnToMailboxResult:
     status: ReturnToMailboxStatus
 
 
+@dataclass(frozen=True)
+class TakeFromMailboxResult:
+    status: TakeFromMailboxStatus
+
+
 def get_key_holder(database_path, key_id):
-    holder = get_current_key_holder(database_path, key_id=key_id)
+    holder = get_current_key_holder_info(database_path, key_id=key_id)
     if holder is None:
         return None
-
     name, surname, room_number = holder
-    return KeyHolder(name=name, surname=surname, room_number=room_number)
+    return KeyHolder(name, surname, room_number)
 
 def user_currently_holds_key(database_path, telegram_user_id, key_id):
     if telegram_user_id is None:
         return False
-    return get_current_key_holder(database_path,key_id,telegram_user_id) is not None
+    return get_current_key_holder_info(database_path,key_id,telegram_user_id) is not None
 
 def can_start_key_handover(database_path, telegram_user_id, key_id):
     if user_currently_holds_key(database_path, telegram_user_id, key_id):
@@ -56,3 +67,14 @@ def return_key_to_mailbox(database_path,telegram_user_id,key_id,mailbox_member_i
         change_key_holder(database_path, key_id, mailbox_member_id)
         return ReturnToMailboxResult(status=ReturnToMailboxStatus.RETURNED)
     return ReturnToMailboxResult(status=ReturnToMailboxStatus.NOT_CURRENT_HOLDER)
+
+
+def take_key_from_mailbox(database_path,telegram_user_id,key_id,mailbox_member_id):
+    if get_current_key_holder_info(database_path,key_id,
+        gym_member_id=mailbox_member_id) is None:
+        return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX)
+    member_id = get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id)
+    if member_id is None:
+        return TakeFromMailboxResult(status=TakeFromMailboxStatus.USER_NOT_REGISTERED)
+    change_key_holder(database_path, key_id, member_id)
+    return TakeFromMailboxResult(status=TakeFromMailboxStatus.TAKEN)

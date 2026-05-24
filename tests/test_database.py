@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.database import (
-    get_current_key_holder,
+    get_current_key_holder_info,
     get_gym_member_id_by_telegram_user_id,
     initialize_database,
     change_key_holder,
@@ -212,7 +212,7 @@ class DatabaseTests(unittest.TestCase):
                 holder_id = create_gym_member(connection, "Ivanov", 1234, name="Dima")
                 key_id = create_key(connection, holder_id)
 
-            holder = get_current_key_holder(database_path, key_id)
+            holder = get_current_key_holder_info(database_path, key_id)
 
             self.assertEqual(("Dima", "Ivanov", 1234), holder)
 
@@ -221,7 +221,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            holder = get_current_key_holder(database_path, key_id=999)
+            holder = get_current_key_holder_info(database_path, key_id=999)
 
             self.assertIsNone(holder)
 
@@ -240,7 +240,7 @@ class DatabaseTests(unittest.TestCase):
                 )
                 key_id = create_key(connection, holder_id)
 
-            holder = get_current_key_holder(
+            holder = get_current_key_holder_info(
                 database_path,
                 key_id,
                 telegram_user_id=123456,
@@ -262,7 +262,7 @@ class DatabaseTests(unittest.TestCase):
                 )
                 create_key(connection, holder_id)
 
-            holder = get_current_key_holder(
+            holder = get_current_key_holder_info(
                 database_path,
                 telegram_user_id=654321,
             )

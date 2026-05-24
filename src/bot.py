@@ -17,6 +17,7 @@ from src.keyboards import (
     RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
     RECEIVER_KEY_INFO_CALLBACK,
     RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK,
+    RECEIVER_MAILBOX_KEY_OBTAINED_CALLBACK,
 )
 from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
 from src.database import initialize_database
@@ -30,6 +31,8 @@ from src.key_service import (
     get_key_holder,
     ReturnToMailboxStatus,
     return_key_to_mailbox,
+    TakeFromMailboxStatus,
+    take_key_from_mailbox,
 )
 from src.messages import (
     UNKNOWN_CALLBACK_ANSWER,
@@ -106,9 +109,22 @@ async def handle_key_return_mailbox(query: CallbackQuery, message: Message) -> N
     await query.answer(reply)
     await edit_to_start_state(message,reply,telegram_user_id)
 
+async def handle_key_obtained_from_mailbox(query: CallbackQuery,message: Message) -> None:
+    telegram_user_id = get_callback_user_id(query)
+    result = take_key_from_mailbox(DEFAULT_DATABASE_PATH,telegram_user_id,DEFAULT_KEY_ID)
+    if result.status == TakeFromMailboxStatus.TAKEN:
+        reply = messages.KEY_TAKEN_FROM_MAILBOX_ANSWER
+    elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
+        reply = messages.KEY_NOT_IN_MAILBOX_ANSWER
+    else:
+        reply = messages.UNREGISTERED_USER_ANSWER
+    await query.answer(reply)
+    await edit_to_start_state(message, reply, telegram_user_id)
+
 CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
     RECEIVER_KEY_INFO_CALLBACK: handle_key_request,
     RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK: handle_key_obtained,
+    RECEIVER_MAILBOX_KEY_OBTAINED_CALLBACK: handle_key_obtained_from_mailbox,
     HOLDER_KEY_HANDOVER_CALLBACK: handle_key_handover_callback,
     KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK: handle_key_obtained_confirmation,
     RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK: handle_key_obtained_cancellation,
