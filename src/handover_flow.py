@@ -12,6 +12,7 @@ from src.key_service import user_currently_holds_key
 from src.telegram_helpers import (
     get_callback_user_display_name,
     get_callback_user_id,
+    messages_are_from_same_chat,
 )
 
 StartStateReply = Callable[[Message, str, int | None], Awaitable[None]]
@@ -154,6 +155,9 @@ async def complete_handover_interaction(
     await pending_handover.state_change_function(
         pending_handover.message, handover_text, pending_handover.holder_user_id,
     )
+    if messages_are_from_same_chat(pending_handover.message, query.message):
+        return
+
     await pending_handover.state_change_function(
         query.message, handover_text, get_callback_user_id(query)
     )
