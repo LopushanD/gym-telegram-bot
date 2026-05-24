@@ -3,7 +3,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from telegram import CallbackQuery, Message
-from src.bot_replies import reply_with_holder_handover_cancel
+from src.bot_replies import reply_with_holder_handover_cancel, reply_with_start_state
 from src import messages
 from src.config import DEFAULT_DATABASE_PATH, HANDOVER_WINDOW_SECONDS
 from src.database import change_key_holder, get_gym_member_id_by_telegram_user_id
@@ -163,22 +163,9 @@ async def handle_pending_handover_cancellation(
     key_id:int,
     query: CallbackQuery,
     message: Message,
-    state_change_function: StartStateReply,
 ) -> None:
     pending_handover = get_pending_handover(key_id)
-    if pending_handover is None:
-        await answer_with_function(
-            query,
-            messages.HANDOVER_NO_PENDING_ANSWER,
-            message,
-            messages.HANDOVER_NO_PENDING_ANSWER,
-            get_callback_user_id(query),
-            state_change_function,
-        )
-        return
-    else:
-        PENDING_HANDOVERS.pop(key_id, None)
-        pending_handover.timeout_task.cancel()
-        reply = messages.KEY_OBTAINED_CANCELLED_ANSWER
-        await answer_with_function(
-                query, reply, message,reply, None, state_change_function)
+    PENDING_HANDOVERS.pop(key_id, None)
+    pending_handover.timeout_task.cancel()
+    await reply_with_start_state(message,messages.KEY_OBTAINED_CANCELLED_ANSWER,get_callback_user_id(query))
+        

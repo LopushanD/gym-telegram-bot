@@ -90,7 +90,7 @@ async def handle_unknown_callback(query: CallbackQuery, message: Message) -> Non
     
 async def handle_holder_key_handover_cancellation(query: CallbackQuery, message: Message):
   await query.answer(KEY_OBTAINED_CANCELLED_ANSWER)
-  await handle_pending_handover_cancellation(DEFAULT_KEY_ID,query,message,reply_with_start_state)
+  await handle_pending_handover_cancellation(DEFAULT_KEY_ID,query,message)
 
 CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
     RECEIVER_KEY_INFO_CALLBACK: handle_key_request,

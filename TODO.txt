@@ -1,5 +1,4 @@
-
-- Add possibility to cancel handing over for the holder of key
+- When you hand over the key. message doesn't get deleted and you now have two messages.
 - Add cancel of haning over due to technical reasons (like person is not in database)
 - For now getting the key is only between two members. So, rename the button to "got the key from member"
 
