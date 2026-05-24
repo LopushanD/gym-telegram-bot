@@ -26,6 +26,8 @@ KEY_RETURN_MAILBOX_NOT_ALLOWED_ANSWER = "Only the current holder can return the 
 KEY_RETURN_MAILBOX_CONFIRMATION_PROMPT = "Please confirm you want return the key to the mailbox."
 KEY_RETURNED_TO_MAILBOX_ANSWER = "The key was returned to the mailbox."
 KEY_RETURN_MAILBOX_CANCELLED_ANSWER = "Returning the key to the mailbox was cancelled."
+KEY_TAKE_MAILBOX_CONFIRMATION_PROMPT = "Please confirm you got the key from the mailbox."
+KEY_TAKE_MAILBOX_CANCELLED_ANSWER = "Taking the key from the mailbox was cancelled."
 KEY_TAKEN_FROM_MAILBOX_ANSWER = "Confirmed. You are now the key holder."
 KEY_NOT_IN_MAILBOX_ANSWER = "The key is not in the mailbox."
 
