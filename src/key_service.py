@@ -5,7 +5,6 @@ from src.config import MAILBOX_MEMBER_ID
 from src.database import (
     change_key_holder,
     get_current_key_holder,
-    get_gym_member_id_by_telegram_user_id,
 )
 
 @dataclass(frozen=True)
@@ -18,9 +17,21 @@ class HandoverStatus(Enum):
     READY = "ready"
     NOT_CURRENT_HOLDER = "not_current_holder"
 
+
+class ReturnToMailboxStatus(Enum):
+    RETURNED = "returned"
+    NOT_CURRENT_HOLDER = "not_current_holder"
+
+
 @dataclass(frozen=True)
 class HandoverResult:
     status: HandoverStatus
+
+
+@dataclass(frozen=True)
+class ReturnToMailboxResult:
+    status: ReturnToMailboxStatus
+
 
 def get_key_holder(database_path, key_id):
     holder = get_current_key_holder(database_path, key_id=key_id)
@@ -33,15 +44,15 @@ def get_key_holder(database_path, key_id):
 def user_currently_holds_key(database_path, telegram_user_id, key_id):
     if telegram_user_id is None:
         return False
-
-    return get_current_key_holder(
-        database_path,
-        key_id=key_id,
-        telegram_user_id=telegram_user_id,
-    ) is not None
+    return get_current_key_holder(database_path,key_id,telegram_user_id) is not None
 
 def can_start_key_handover(database_path, telegram_user_id, key_id):
-    if not user_currently_holds_key(database_path, telegram_user_id, key_id):
-        return HandoverResult(status=HandoverStatus.NOT_CURRENT_HOLDER)
+    if user_currently_holds_key(database_path, telegram_user_id, key_id):
+        return HandoverResult(status=HandoverStatus.READY)
+    return HandoverResult(status=HandoverStatus.NOT_CURRENT_HOLDER)
 
-    return HandoverResult(status=HandoverStatus.READY)
+def return_key_to_mailbox(database_path,telegram_user_id,key_id,mailbox_member_id=MAILBOX_MEMBER_ID):
+    if user_currently_holds_key(database_path, telegram_user_id, key_id):
+        change_key_holder(database_path, key_id, mailbox_member_id)
+        return ReturnToMailboxResult(status=ReturnToMailboxStatus.RETURNED)
+    return ReturnToMailboxResult(status=ReturnToMailboxStatus.NOT_CURRENT_HOLDER)

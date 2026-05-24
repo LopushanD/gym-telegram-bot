@@ -31,7 +31,7 @@ def build_start_keyboard(include_holder_actions: bool = False) -> InlineKeyboard
             ],
             [
                 InlineKeyboardButton("Got key from member", callback_data=RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK),
-                InlineKeyboardButton("Got key from mailbox", callback_data=None)
+                # InlineKeyboardButton("Got key from mailbox", callback_data=None)
             ],
         ]
     return InlineKeyboardMarkup(keyboard)
