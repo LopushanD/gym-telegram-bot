@@ -3,12 +3,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from telegram import CallbackQuery, Message
-from src.database import change_key_holder,get_gym_member_id_by_telegram_user_id
-from src.bot import reply_holder_key_handover_cancel_button
+from src.bot_replies import reply_with_holder_handover_cancel
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID,HANDOVER_WINDOW_SECONDS
+from src.config import DEFAULT_DATABASE_PATH, HANDOVER_WINDOW_SECONDS
+from src.database import change_key_holder, get_gym_member_id_by_telegram_user_id
 from src.keyboards import build_key_obtained_receiver_confirmation_keyboard
-from src.key_service import HandoverStatus, user_currently_holds_key
+from src.key_service import user_currently_holds_key
 from src.telegram_helpers import (
     get_callback_user_display_name,
     get_callback_user_id,
@@ -51,15 +51,15 @@ def start_pending_handover(key_id,holder_user_id: int,holder_display_name: str,m
 
 async def fail_pending_handover_after_timeout(key_id: int) -> None:
     await asyncio.sleep(HANDOVER_WINDOW_SECONDS)
-    try:
-        pending_handover = PENDING_HANDOVERS.pop(key_id)
-        await pending_handover.state_change_function(
-            pending_handover.message, messages.HANDOVER_FAILED_ANSWER,
-            pending_handover.holder_user_id,
-        )
-    except:
-        return #TODO: implement better handling
-        # think if it is possible to get timeout when there are no PENDING_HANDOVERS left
+    pending_handover = PENDING_HANDOVERS.pop(key_id, None)
+    if pending_handover is None:
+        return
+
+    await pending_handover.state_change_function(
+        pending_handover.message, messages.HANDOVER_FAILED_ANSWER,
+        pending_handover.holder_user_id,
+    )
+
 
 def get_pending_handover(key_id) -> PendingHandover | None:
     pending_handover = PENDING_HANDOVERS.get(key_id)
@@ -83,7 +83,7 @@ async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state
         )
         # If reached this point, everything went successfully
         reply = messages.HANDOVER_READY_ANSWER
-        state_change_function = reply_holder_key_handover_cancel_button
+        state_change_function = reply_with_holder_handover_cancel
     await answer_with_function(
         query,
         reply,
@@ -159,7 +159,6 @@ async def complete_handover_interaction(
     )
     
 
-#TODO: implement for handing side
 async def handle_pending_handover_cancellation(
     key_id:int,
     query: CallbackQuery,
@@ -167,8 +166,19 @@ async def handle_pending_handover_cancellation(
     state_change_function: StartStateReply,
 ) -> None:
     pending_handover = get_pending_handover(key_id)
-    PENDING_HANDOVERS.pop(key_id,None)
-    pending_handover.timeout_task.cancel()
-    reply = messages.KEY_OBTAINED_CANCELLED_ANSWER
-    await answer_with_function(
-            query, reply, message,reply, None, state_change_function)
+    if pending_handover is None:
+        await answer_with_function(
+            query,
+            messages.HANDOVER_NO_PENDING_ANSWER,
+            message,
+            messages.HANDOVER_NO_PENDING_ANSWER,
+            get_callback_user_id(query),
+            state_change_function,
+        )
+        return
+    else:
+        PENDING_HANDOVERS.pop(key_id, None)
+        pending_handover.timeout_task.cancel()
+        reply = messages.KEY_OBTAINED_CANCELLED_ANSWER
+        await answer_with_function(
+                query, reply, message,reply, None, state_change_function)

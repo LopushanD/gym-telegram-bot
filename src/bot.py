@@ -1,20 +1,18 @@
 from collections.abc import Awaitable, Callable
-from pathlib import Path
-import sys
 from typing import cast
-from src import messages
-from telegram import CallbackQuery, Message, Update
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
+from telegram import CallbackQuery, Message, Update
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler
+
+from src import messages
+from src.bot_replies import reply_with_holder_handover_cancel, reply_with_start_state
 from src.keyboards import (
-    RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK,
-    KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
     HOLDER_KEY_HANDOVER_CALLBACK,
+    HOLDER_KEY_HANDOVER_CANCEL_CALLBACK,
+    KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
     RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
     RECEIVER_KEY_INFO_CALLBACK,
-    HOLDER_KEY_HANDOVER_CANCEL_CALLBACK,
-    build_start_keyboard,
-    build_key_handover_holder_keyboard,
+    RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK,
 )
 from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
 from src.database import initialize_database
@@ -26,7 +24,6 @@ from src.handover_flow import (
 )
 from src.key_service import (
     get_key_holder,
-    user_currently_holds_key,
 )
 from src.messages import (
     UNKNOWN_CALLBACK_ANSWER,
@@ -37,27 +34,14 @@ from src.telegram_helpers import get_callback_user_id, get_update_user_id
 
 CallbackHandler = Callable[[CallbackQuery, Message], Awaitable[None]]
 
-async def reply_with_start_state(message: Message,text: str =messages.START_STATE_TEXT,telegram_user_id: int | None=None) -> None:
-    await message.reply_text(
-        text,
-        reply_markup=build_start_keyboard(
-            include_holder_actions=user_currently_holds_key(
-                DEFAULT_DATABASE_PATH,
-                telegram_user_id,
-                DEFAULT_KEY_ID,
-            ),
-        ),
+
+async def start_state_command_handler(update: Update, context) -> None:
+    await reply_with_start_state(
+        update.effective_message,
+        messages.START_STATE_TEXT,
+        telegram_user_id=get_update_user_id(update),
     )
 
-async def reply_holder_key_handover_cancel_button(message: Message,text: str =messages.START_STATE_TEXT,telegram_user_id: int | None=None) -> None:
-    await message.reply_text(
-        text,
-        reply_markup=build_key_handover_holder_keyboard()
-    )
-
-
-async def start_state_command_handler(update: Update,context) -> None:
-    await reply_with_start_state(update.effective_message,messages.START_STATE_TEXT,telegram_user_id=get_update_user_id(update))
 
 async def callback_query_handler(update: Update,context) -> None:
     query = update.callback_query
