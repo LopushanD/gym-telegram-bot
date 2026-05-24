@@ -4,9 +4,10 @@ from dataclasses import dataclass
 
 from telegram import CallbackQuery, Message
 from src.database import change_key_holder,get_gym_member_id_by_telegram_user_id
+from src.bot import reply_holder_key_handover_cancel_button
 from src import messages
 from src.config import DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID,HANDOVER_WINDOW_SECONDS
-from src.keyboards import build_key_obtained_confirmation_keyboard
+from src.keyboards import build_key_obtained_receiver_confirmation_keyboard
 from src.key_service import HandoverStatus, user_currently_holds_key
 from src.telegram_helpers import (
     get_callback_user_display_name,
@@ -25,7 +26,7 @@ class PendingHandover:
 
 PENDING_HANDOVERS: dict[int, PendingHandover] = {}
 
-async def answer_with_start(
+async def answer_with_function(
     query: CallbackQuery,
     answer_text: str,
     message: Message,
@@ -82,7 +83,8 @@ async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state
         )
         # If reached this point, everything went successfully
         reply = messages.HANDOVER_READY_ANSWER
-    await answer_with_start(
+        state_change_function = reply_holder_key_handover_cancel_button
+    await answer_with_function(
         query,
         reply,
         message,
@@ -102,7 +104,7 @@ async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,m
     elif telegram_user_id == pending_handover.holder_user_id:
         reply = messages.HANDOVER_SELF_CONFIRMATION_ANSWER
     if reply is not None:
-        await answer_with_start(query, reply, message,reply, telegram_user_id, state_change_function)
+        await answer_with_function(query, reply, message,reply, telegram_user_id, state_change_function)
     else:
         await query.answer(messages.PLEASE_CONFIRM_KEY_OBTAINED)
         prompt = messages.HANDOVER_CONFIRMATION_PROMPT.format(
@@ -110,7 +112,7 @@ async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,m
         )
         await message.reply_text(
             prompt,
-            reply_markup=build_key_obtained_confirmation_keyboard(),
+            reply_markup=build_key_obtained_receiver_confirmation_keyboard(),
         )
 
 async def handle_pending_handover_confirmation(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> bool:
@@ -130,7 +132,7 @@ async def handle_pending_handover_confirmation(key_id,query: CallbackQuery,messa
             if member_id is None:
                 reply = messages.UNREGISTERED_USER_ANSWER
     if reply is not None:
-        await answer_with_start(
+        await answer_with_function(
             query, reply, message,reply, telegram_user_id, state_change_function)
     else:
         await complete_handover_interaction(member_id,key_id,query, pending_handover)
@@ -158,14 +160,15 @@ async def complete_handover_interaction(
     
 
 #TODO: implement for handing side
-# async def handle_pending_handover_cancellation(
-#     query: CallbackQuery,
-#     message: Message,
-#     state_change_function: StartStateReply,
-# ) -> None:
-#     pending_handover = get_pending_handover(DEFAULT_KEY_ID)
-#     reply = messages.KEY_OBTAINED_CANCELLED_ANSWER
-#     pending_handover.timeout_task.cancel()
-#     PENDING_HANDOVERS.pop(DEFAULT_KEY_ID,None)
-#     await answer_with_start(
-#             query, reply, message,reply, None, state_change_function)
+async def handle_pending_handover_cancellation(
+    key_id:int,
+    query: CallbackQuery,
+    message: Message,
+    state_change_function: StartStateReply,
+) -> None:
+    pending_handover = get_pending_handover(key_id)
+    PENDING_HANDOVERS.pop(key_id,None)
+    pending_handover.timeout_task.cancel()
+    reply = messages.KEY_OBTAINED_CANCELLED_ANSWER
+    await answer_with_function(
+            query, reply, message,reply, None, state_change_function)

@@ -59,14 +59,14 @@ def assert_reply_text_with_start_keyboard(
     test_case.assertEqual((expected_text,), args)
     if includes_holder_actions:
         test_case.assertEqual("Hand over the key", keyboard[0][0].text)
-        test_case.assertEqual(bot.KEY_HANDOVER_CALLBACK, keyboard[0][0].callback_data)
+        test_case.assertEqual(bot.HOLDER_KEY_HANDOVER_CALLBACK, keyboard[0][0].callback_data)
         test_case.assertEqual(1, len(keyboard))
         return
 
     test_case.assertEqual("Request the key", keyboard[0][0].text)
-    test_case.assertEqual(bot.KEY_REQUEST_CALLBACK, keyboard[0][0].callback_data)
+    test_case.assertEqual(bot.RECEIVER_KEY_INFO_CALLBACK, keyboard[0][0].callback_data)
     test_case.assertEqual("Got the key", keyboard[1][0].text)
-    test_case.assertEqual(bot.KEY_OBTAINED_CALLBACK, keyboard[1][0].callback_data)
+    test_case.assertEqual(bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK, keyboard[1][0].callback_data)
     test_case.assertEqual(2, len(keyboard))
 
 
@@ -82,14 +82,14 @@ def assert_last_reply_text_with_start_keyboard(
     test_case.assertEqual((expected_text,), args)
     if includes_holder_actions:
         test_case.assertEqual("Hand over the key", keyboard[0][0].text)
-        test_case.assertEqual(bot.KEY_HANDOVER_CALLBACK, keyboard[0][0].callback_data)
+        test_case.assertEqual(bot.HOLDER_KEY_HANDOVER_CALLBACK, keyboard[0][0].callback_data)
         test_case.assertEqual(1, len(keyboard))
         return
 
     test_case.assertEqual("Request the key", keyboard[0][0].text)
-    test_case.assertEqual(bot.KEY_REQUEST_CALLBACK, keyboard[0][0].callback_data)
+    test_case.assertEqual(bot.RECEIVER_KEY_INFO_CALLBACK, keyboard[0][0].callback_data)
     test_case.assertEqual("Got the key", keyboard[1][0].text)
-    test_case.assertEqual(bot.KEY_OBTAINED_CALLBACK, keyboard[1][0].callback_data)
+    test_case.assertEqual(bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK, keyboard[1][0].callback_data)
     test_case.assertEqual(2, len(keyboard))
 
 
@@ -114,7 +114,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
     async def test_reply_with_start_state_sends_main_keyboard(self):
         message = SimpleNamespace(reply_text=AsyncMock())
 
-        await bot.reply_with_start_state(message)
+        await bot.reply_holder_key_handover_cancel_button(message)
 
         assert_reply_text_with_start_keyboard(
             self,
@@ -130,7 +130,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             "user_currently_holds_key",
             return_value=True,
         ) as user_currently_holds_key:
-            await bot.reply_with_start_state(
+            await bot.reply_holder_key_handover_cancel_button(
                 message,
                 telegram_user_id=123,
             )
@@ -149,7 +149,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             message.reply_text,
-            bot.KEY_OBTAINED_CALLBACK,
+            bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
         )
 
     async def test_reply_with_start_state_keeps_default_buttons_for_non_holder(self):
@@ -160,7 +160,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             "user_currently_holds_key",
             return_value=False,
         ):
-            await bot.reply_with_start_state(
+            await bot.reply_holder_key_handover_cancel_button(
                 message,
                 telegram_user_id=456,
             )
@@ -193,11 +193,11 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             update.message.reply_text,
-            bot.KEY_OBTAINED_CALLBACK,
+            bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
         )
 
     async def test_request_key_callback_replies_with_current_holder(self):
-        update = create_callback_update(bot.KEY_REQUEST_CALLBACK)
+        update = create_callback_update(bot.RECEIVER_KEY_INFO_CALLBACK)
 
         with patch.object(
             bot,
@@ -215,7 +215,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_request_key_callback_replies_when_key_is_missing(self):
-        update = create_callback_update(bot.KEY_REQUEST_CALLBACK)
+        update = create_callback_update(bot.RECEIVER_KEY_INFO_CALLBACK)
 
         with patch.object(bot, "get_key_holder", return_value=None):
             await bot.callback_query_handler(update, SimpleNamespace())
@@ -229,7 +229,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_got_key_callback_asks_for_confirmation(self):
-        update = create_callback_update(bot.KEY_OBTAINED_CALLBACK)
+        update = create_callback_update(bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK)
 
         await bot.callback_query_handler(update, SimpleNamespace())
 
@@ -241,13 +241,13 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(("Please confirm that you got the key.",), args)
         self.assertEqual("Confirm", keyboard[0][0].text)
-        self.assertEqual(bot.CONFIRM_KEY_OBTAINED_CALLBACK, keyboard[0][0].callback_data)
+        self.assertEqual(bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK, keyboard[0][0].callback_data)
         self.assertEqual("Cancel", keyboard[0][1].text)
-        self.assertEqual(bot.CANCEL_KEY_OBTAINED_CALLBACK, keyboard[0][1].callback_data)
+        self.assertEqual(bot.KEY_HANDOVER_RECEIVER_CANCEL_CALLBACK, keyboard[0][1].callback_data)
 
     async def test_key_handover_callback_gives_current_holder_instructions(self):
         update = create_callback_update(
-            bot.KEY_HANDOVER_CALLBACK,
+            bot.HOLDER_KEY_HANDOVER_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
         )
@@ -273,7 +273,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             update.callback_query.message.reply_text,
-            bot.KEY_OBTAINED_CALLBACK,
+            bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
         )
         self.assertIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
         self.assertEqual(
@@ -283,12 +283,12 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_got_key_during_pending_handover_asks_member_to_confirm(self):
         handover_update = create_callback_update(
-            bot.KEY_HANDOVER_CALLBACK,
+            bot.HOLDER_KEY_HANDOVER_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
         )
         obtained_update = create_callback_update(
-            bot.KEY_OBTAINED_CALLBACK,
+            bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
             telegram_user_id=456,
             full_name="Member Two",
         )
@@ -324,19 +324,19 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             args,
         )
         self.assertEqual("Confirm", keyboard[0][0].text)
-        self.assertEqual(bot.CONFIRM_KEY_OBTAINED_CALLBACK, keyboard[0][0].callback_data)
+        self.assertEqual(bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK, keyboard[0][0].callback_data)
         self.assertEqual("Cancel", keyboard[0][1].text)
-        self.assertEqual(bot.CANCEL_KEY_OBTAINED_CALLBACK, keyboard[0][1].callback_data)
+        self.assertEqual(bot.KEY_HANDOVER_RECEIVER_CANCEL_CALLBACK, keyboard[0][1].callback_data)
         self.assertIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
 
     async def test_confirm_completes_pending_handover_without_database_update(self):
         handover_update = create_callback_update(
-            bot.KEY_HANDOVER_CALLBACK,
+            bot.HOLDER_KEY_HANDOVER_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
         )
         confirm_update = create_callback_update(
-            bot.CONFIRM_KEY_OBTAINED_CALLBACK,
+            bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
             telegram_user_id=456,
             full_name="Member Two",
         )
@@ -382,13 +382,13 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_completed_handover_sends_one_message_in_shared_chat(self):
         handover_update = create_callback_update(
-            bot.KEY_HANDOVER_CALLBACK,
+            bot.HOLDER_KEY_HANDOVER_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
             chat_id=10,
         )
         obtained_update = create_callback_update(
-            bot.CONFIRM_KEY_OBTAINED_CALLBACK,
+            bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
             telegram_user_id=456,
             full_name="Member Two",
             chat_id=10,
@@ -425,7 +425,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_pending_handover_times_out_and_keeps_current_holder(self):
         update = create_callback_update(
-            bot.KEY_HANDOVER_CALLBACK,
+            bot.HOLDER_KEY_HANDOVER_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
         )
@@ -454,12 +454,12 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancel_pending_handover_returns_both_members_to_start_state(self):
         handover_update = create_callback_update(
-            bot.KEY_HANDOVER_CALLBACK,
+            bot.HOLDER_KEY_HANDOVER_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
         )
         cancel_update = create_callback_update(
-            bot.CANCEL_KEY_OBTAINED_CALLBACK,
+            bot.KEY_HANDOVER_RECEIVER_CANCEL_CALLBACK,
             telegram_user_id=456,
             full_name="Member Two",
         )
@@ -497,12 +497,12 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_current_holder_cannot_complete_own_pending_handover(self):
         handover_update = create_callback_update(
-            bot.KEY_HANDOVER_CALLBACK,
+            bot.HOLDER_KEY_HANDOVER_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
         )
         obtained_update = create_callback_update(
-            bot.KEY_OBTAINED_CALLBACK,
+            bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
             telegram_user_id=123,
             full_name="Member One",
         )
@@ -530,7 +530,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(bot.DEFAULT_KEY_ID, handover_flow.PENDING_HANDOVERS)
 
     async def test_key_handover_callback_rejects_non_holder(self):
-        update = create_callback_update(bot.KEY_HANDOVER_CALLBACK, telegram_user_id=456)
+        update = create_callback_update(bot.HOLDER_KEY_HANDOVER_CALLBACK, telegram_user_id=456)
 
         with (
             patch.object(
@@ -554,7 +554,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_confirm_key_obtained_callback_updates_holder_and_history(self):
         update = create_callback_update(
-            bot.CONFIRM_KEY_OBTAINED_CALLBACK,
+            bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
             telegram_user_id=123,
         )
 
@@ -589,7 +589,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             update.callback_query.message.reply_text,
-            bot.KEY_OBTAINED_CALLBACK,
+            bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
         )
 
     async def test_confirm_key_obtained_callback_updates_database(self):
@@ -630,7 +630,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
                 ).lastrowid
 
             update = create_callback_update(
-                bot.CONFIRM_KEY_OBTAINED_CALLBACK,
+                bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
                 telegram_user_id=222,
             )
 
@@ -662,11 +662,11 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
             assert_keyboard_does_not_include_callback(
                 self,
                 update.callback_query.message.reply_text,
-                bot.KEY_OBTAINED_CALLBACK,
+                bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
             )
 
     async def test_confirm_key_obtained_callback_rejects_missing_telegram_user(self):
-        update = create_callback_update(bot.CONFIRM_KEY_OBTAINED_CALLBACK)
+        update = create_callback_update(bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK)
 
         with patch.object(
             bot,
@@ -692,7 +692,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_confirm_key_obtained_callback_rejects_unregistered_user(self):
         update = create_callback_update(
-            bot.CONFIRM_KEY_OBTAINED_CALLBACK,
+            bot.KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
             telegram_user_id=123,
         )
 
@@ -722,7 +722,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_cancel_key_obtained_callback_replies_with_cancellation(self):
-        update = create_callback_update(bot.CANCEL_KEY_OBTAINED_CALLBACK)
+        update = create_callback_update(bot.KEY_HANDOVER_RECEIVER_CANCEL_CALLBACK)
 
         await bot.callback_query_handler(update, SimpleNamespace())
 
@@ -766,7 +766,7 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert_keyboard_does_not_include_callback(
             self,
             update.callback_query.message.reply_text,
-            bot.KEY_OBTAINED_CALLBACK,
+            bot.RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
         )
 
 

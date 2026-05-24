@@ -7,12 +7,14 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 from src.keyboards import (
-    CANCEL_KEY_OBTAINED_CALLBACK,
-    CONFIRM_KEY_OBTAINED_CALLBACK,
-    KEY_HANDOVER_CALLBACK,
-    KEY_OBTAINED_CALLBACK,
-    KEY_REQUEST_CALLBACK,
+    RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK,
+    KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
+    HOLDER_KEY_HANDOVER_CALLBACK,
+    RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
+    RECEIVER_KEY_INFO_CALLBACK,
+    HOLDER_KEY_HANDOVER_CANCEL_CALLBACK,
     build_start_keyboard,
+    build_key_handover_holder_keyboard,
 )
 from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
 from src.database import initialize_database
@@ -20,6 +22,7 @@ from src.handover_flow import (
     handle_key_handover,
     handle_pending_handover_confirmation,
     handle_pending_handover_obtained_backend,
+    handle_pending_handover_cancellation,
 )
 from src.key_service import (
     get_key_holder,
@@ -27,6 +30,7 @@ from src.key_service import (
 )
 from src.messages import (
     UNKNOWN_CALLBACK_ANSWER,
+    KEY_OBTAINED_CANCELLED_ANSWER,
     current_key_holder_text,
 )
 from src.telegram_helpers import get_callback_user_id, get_update_user_id
@@ -44,6 +48,13 @@ async def reply_with_start_state(message: Message,text: str =messages.START_STAT
             ),
         ),
     )
+
+async def reply_holder_key_handover_cancel_button(message: Message,text: str =messages.START_STATE_TEXT,telegram_user_id: int | None=None) -> None:
+    await message.reply_text(
+        text,
+        reply_markup=build_key_handover_holder_keyboard()
+    )
+
 
 async def start_state_command_handler(update: Update,context) -> None:
     await reply_with_start_state(update.effective_message,messages.START_STATE_TEXT,telegram_user_id=get_update_user_id(update))
@@ -92,13 +103,18 @@ async def handle_unknown_callback(query: CallbackQuery, message: Message) -> Non
     await reply_with_start_state(message,UNKNOWN_CALLBACK_ANSWER,
                                  telegram_user_id=get_callback_user_id(query)
     )
+    
+async def handle_holder_key_handover_cancellation(query: CallbackQuery, message: Message):
+  await query.answer(KEY_OBTAINED_CANCELLED_ANSWER)
+  await handle_pending_handover_cancellation(DEFAULT_KEY_ID,query,message,reply_with_start_state)
 
 CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
-    KEY_REQUEST_CALLBACK: handle_key_request,
-    KEY_OBTAINED_CALLBACK: handle_key_obtained,
-    KEY_HANDOVER_CALLBACK: handle_key_handover_callback,
-    CONFIRM_KEY_OBTAINED_CALLBACK: handle_key_obtained_confirmation,
-    CANCEL_KEY_OBTAINED_CALLBACK: handle_key_obtained_cancellation,
+    RECEIVER_KEY_INFO_CALLBACK: handle_key_request,
+    RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK: handle_key_obtained,
+    HOLDER_KEY_HANDOVER_CALLBACK: handle_key_handover_callback,
+    KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK: handle_key_obtained_confirmation,
+    RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK: handle_key_obtained_cancellation,
+    HOLDER_KEY_HANDOVER_CANCEL_CALLBACK: handle_holder_key_handover_cancellation,
 }
 
 def main() -> None:
