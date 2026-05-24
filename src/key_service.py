@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from src.config import MAILBOX_MEMBER_ID
 from src.database import (
     change_key_holder,
     get_current_key_holder,

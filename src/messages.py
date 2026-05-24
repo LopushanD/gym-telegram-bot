@@ -22,6 +22,8 @@ UNREGISTERED_USER_ANSWER = "You are not registered as a gym member."
 KEY_OBTAINED_CONFIRMED_ANSWER = "Confirmed. You are now recorded as the key holder."
 
 KEY_OBTAINED_CANCELLED_ANSWER = "The handover was cancelled."
+KEY_RETURN_MAILBOX_NOT_ALLOWED_ANSWER = "Only the current holder can return the key to the mailbox."
+KEY_RETURNED_TO_MAILBOX_ANSWER = "The key was returned to the mailbox."
 
 UNKNOWN_CALLBACK_ANSWER = "Unknown button. Back to the start."
 

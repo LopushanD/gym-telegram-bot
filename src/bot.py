@@ -12,13 +12,14 @@ from src.bot_replies import (
 from src.keyboards import (
     HOLDER_KEY_HANDOVER_CALLBACK,
     HOLDER_KEY_HANDOVER_CANCEL_CALLBACK,
+    HOLDER_KEY_RETURN_MAILBOX_CALLBACK,
     KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK,
     RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK,
     RECEIVER_KEY_INFO_CALLBACK,
     RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK,
 )
-from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
-from src.database import initialize_database
+from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID,MAILBOX_MEMBER_ID
+from src.database import initialize_database,change_key_holder
 from src.handover_flow import (
     handle_key_handover,
     handle_pending_handover_confirmation,
@@ -27,6 +28,7 @@ from src.handover_flow import (
 )
 from src.key_service import (
     get_key_holder,
+    user_currently_holds_key,
 )
 from src.messages import (
     UNKNOWN_CALLBACK_ANSWER,
@@ -92,6 +94,17 @@ async def handle_holder_key_handover_cancellation(query: CallbackQuery, message:
   await query.answer(KEY_OBTAINED_CANCELLED_ANSWER)
   await handle_pending_handover_cancellation(DEFAULT_KEY_ID,query,message)
 
+
+async def handle_key_return_mailbox(query: CallbackQuery, message: Message) -> None:
+    await query.answer(reply)
+    telegram_user_id = get_callback_user_id(query)
+    if user_currently_holds_key(DEFAULT_DATABASE_PATH, telegram_user_id, DEFAULT_KEY_ID):
+        change_key_holder(DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID,MAILBOX_MEMBER_ID)
+        reply = messages.KEY_RETURNED_TO_MAILBOX_ANSWER
+    else:
+        reply = messages.KEY_RETURN_MAILBOX_NOT_ALLOWED_ANSWER
+    await edit_to_start_state(message,reply,telegram_user_id=telegram_user_id)
+
 CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
     RECEIVER_KEY_INFO_CALLBACK: handle_key_request,
     RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK: handle_key_obtained,
@@ -99,6 +112,7 @@ CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
     KEY_HANDOVER_RECEIVER_CONFIRMATION_CALLBACK: handle_key_obtained_confirmation,
     RECEIVER_KEY_HANDOVER_CANCEL_CALLBACK: handle_key_obtained_cancellation,
     HOLDER_KEY_HANDOVER_CANCEL_CALLBACK: handle_holder_key_handover_cancellation,
+    HOLDER_KEY_RETURN_MAILBOX_CALLBACK: handle_key_return_mailbox,
 }
 
 def main() -> None:
