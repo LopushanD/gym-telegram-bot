@@ -3,7 +3,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from telegram import CallbackQuery, Message
-from src.bot_replies import reply_with_holder_handover_cancel, reply_with_start_state
+from src.bot_replies import edit_to_holder_handover_cancel, edit_to_start_state
 from src import messages
 from src.config import DEFAULT_DATABASE_PATH, HANDOVER_WINDOW_SECONDS
 from src.database import change_key_holder, get_gym_member_id_by_telegram_user_id
@@ -84,7 +84,7 @@ async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state
         )
         # If reached this point, everything went successfully
         reply = messages.HANDOVER_READY_ANSWER
-        state_change_function = reply_with_holder_handover_cancel
+        state_change_function = edit_to_holder_handover_cancel
     await answer_with_function(
         query,
         reply,
@@ -111,7 +111,7 @@ async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,m
         prompt = messages.HANDOVER_CONFIRMATION_PROMPT.format(
             from_member=pending_handover.holder_display_name,
         )
-        await message.reply_text(
+        await message.edit_text(
             prompt,
             reply_markup=build_key_obtained_receiver_confirmation_keyboard(),
         )
@@ -171,5 +171,5 @@ async def handle_pending_handover_cancellation(
     pending_handover = get_pending_handover(key_id)
     PENDING_HANDOVERS.pop(key_id, None)
     pending_handover.timeout_task.cancel()
-    await reply_with_start_state(message,messages.KEY_OBTAINED_CANCELLED_ANSWER,get_callback_user_id(query))
+    await edit_to_start_state(message,messages.KEY_OBTAINED_CANCELLED_ANSWER,get_callback_user_id(query))
         

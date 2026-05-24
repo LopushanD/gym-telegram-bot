@@ -5,7 +5,10 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 
 from src import messages
-from src.bot_replies import reply_with_holder_handover_cancel, reply_with_start_state
+from src.bot_replies import (
+    edit_to_start_state,
+    reply_with_start_state,
+)
 from src.keyboards import (
     HOLDER_KEY_HANDOVER_CALLBACK,
     HOLDER_KEY_HANDOVER_CANCEL_CALLBACK,
@@ -46,7 +49,6 @@ async def start_state_command_handler(update: Update, context) -> None:
 async def callback_query_handler(update: Update,context) -> None:
     query = update.callback_query
     received_message = cast(Message, query.message)
-    await received_message.delete()
 
     callback_data = query.data if isinstance(query.data, str) else None
     handler = CALLBACK_HANDLERS.get(callback_data, handle_unknown_callback)
@@ -55,12 +57,10 @@ async def callback_query_handler(update: Update,context) -> None:
 async def handle_key_request(query: CallbackQuery, message: Message) -> None:
     holder = get_key_holder(DEFAULT_DATABASE_PATH, key_id=DEFAULT_KEY_ID)
     if holder is None:
-        await message.reply_text("For some reason key holder is None. It really shouldn't be like this" +
-                           "Please, write developer about it.")
         text = messages.START_STATE_TEXT
     else:
         text = current_key_holder_text(holder)
-    await reply_with_start_state(
+    await edit_to_start_state(
         message,
         text,
         telegram_user_id=get_callback_user_id(query),
@@ -68,23 +68,23 @@ async def handle_key_request(query: CallbackQuery, message: Message) -> None:
 
 async def handle_key_obtained(query: CallbackQuery, message: Message) -> None:
     await query.answer()
-    await handle_pending_handover_obtained_backend(DEFAULT_KEY_ID,query,message,reply_with_start_state)
+    await handle_pending_handover_obtained_backend(DEFAULT_KEY_ID,query,message,edit_to_start_state)
 
 async def handle_key_handover_callback(query: CallbackQuery,message: Message) -> None:
     await query.answer()
-    await handle_key_handover(DEFAULT_KEY_ID,query, message, reply_with_start_state)
+    await handle_key_handover(DEFAULT_KEY_ID, query, message, edit_to_start_state)
 
 async def handle_key_obtained_confirmation(query: CallbackQuery,message: Message) -> None:
     await query.answer()
-    await handle_pending_handover_confirmation(DEFAULT_KEY_ID,query,message,reply_with_start_state)
+    await handle_pending_handover_confirmation(DEFAULT_KEY_ID,query,message,edit_to_start_state)
 
 async def handle_key_obtained_cancellation(query: CallbackQuery,message: Message) -> None:
     await query.answer()
-    await reply_with_start_state(query.message,messages.START_STATE_TEXT,query.from_user.id)
+    await edit_to_start_state(query.message,messages.START_STATE_TEXT,query.from_user.id)
 
 async def handle_unknown_callback(query: CallbackQuery, message: Message) -> None:
     await query.answer(UNKNOWN_CALLBACK_ANSWER)
-    await reply_with_start_state(message,UNKNOWN_CALLBACK_ANSWER,
+    await edit_to_start_state(message,UNKNOWN_CALLBACK_ANSWER,
                                  telegram_user_id=get_callback_user_id(query)
     )
     
