@@ -17,7 +17,7 @@ def build_start_state_markup(telegram_user_id: int | None = None):
 
 async def reply_with_start_state(
     message: Message,
-    text: str = messages.START_STATE_TEXT,
+    text: str = messages.START_USER_MENU_TEXT,
     telegram_user_id: int | None = None,
 ) -> None:
     """creates new message (not edits the old one) with start state"""
@@ -28,7 +28,7 @@ async def reply_with_start_state(
 
 async def edit_to_start_state(
     message: Message,
-    text: str = messages.START_STATE_TEXT,
+    text: str = messages.START_USER_MENU_TEXT,
     telegram_user_id: int | None = None,
 ) -> None:
     await message.edit_text(
@@ -38,7 +38,7 @@ async def edit_to_start_state(
 
 async def edit_to_holder_handover_cancel(
     message: Message,
-    text: str = messages.START_STATE_TEXT,
+    text: str = messages.START_USER_MENU_TEXT,
     telegram_user_id: int | None = None,
 ) -> None:
     await message.edit_text(

@@ -13,6 +13,8 @@ class KeyHolder:
     name: str
     surname: str
     room_number: int
+    telegram_name: str | None
+    phone_number: str | None
 
 class HandoverStatus(Enum):
     READY = "ready"
@@ -27,6 +29,7 @@ class ReturnToMailboxStatus(Enum):
 class TakeFromMailboxStatus(Enum):
     TAKEN = "taken"
     KEY_NOT_IN_MAILBOX = "key_not_in_mailbox"
+    MISSING_TELEGRAM_USER = "missing_telegram_user"
     USER_NOT_REGISTERED = "user_not_registered"
 
 
@@ -49,8 +52,8 @@ def get_key_holder(database_path, key_id):
     holder = get_current_key_holder_info(database_path, key_id=key_id)
     if holder is None:
         return None
-    name, surname, room_number = holder
-    return KeyHolder(name, surname, room_number)
+    name, surname, room_number, telegram_name, phone_number = holder
+    return KeyHolder(name, surname, room_number, telegram_name, phone_number)
 
 def user_currently_holds_key(database_path, telegram_user_id, key_id):
     if telegram_user_id is None:
@@ -73,6 +76,8 @@ def take_key_from_mailbox(database_path,telegram_user_id,key_id,mailbox_member_i
     if get_current_key_holder_info(database_path,key_id,
         gym_member_id=mailbox_member_id) is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX)
+    if telegram_user_id is None:
+        return TakeFromMailboxResult(status=TakeFromMailboxStatus.MISSING_TELEGRAM_USER)
     member_id = get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id)
     if member_id is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.USER_NOT_REGISTERED)

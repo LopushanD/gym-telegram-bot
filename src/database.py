@@ -39,7 +39,9 @@ def initialize_database(database_path):
                 name TEXT,
                 surname TEXT NOT NULL,
                 room_number INTEGER NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                telegram_name TEXT,
+                phone_number TEXT
             )
             """
         )
@@ -107,7 +109,12 @@ def get_current_key_holder_info(database_path, key_id, telegram_user_id=None,
                                 gym_member_id=None):
     """Return the current holder details for a key, or None if the key is missing."""
     query = """
-        SELECT gym_members.name, gym_members.surname, gym_members.room_number
+        SELECT
+            gym_members.name,
+            gym_members.surname,
+            gym_members.room_number,
+            gym_members.telegram_name,
+            gym_members.phone_number
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
         WHERE keys.id = ?
@@ -174,16 +181,26 @@ def populate_members_table_with_mock_data(database_path,n_members,rng=None):
                 rng,
                 used_telegram_user_ids,
             )
+            name = rng.choice(FIRST_NAMES)
             cursor = connection.execute(
                 """
-                INSERT INTO gym_members (telegram_user_id, name, surname, room_number)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO gym_members (
+                    telegram_user_id,
+                    name,
+                    surname,
+                    room_number,
+                    telegram_name,
+                    phone_number
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     telegram_user_id,
-                    rng.choice(FIRST_NAMES),
+                    name,
                     rng.choice(SURNAMES),
                     rng.randint(1000, 9999),
+                    f"@{name.lower()}{telegram_user_id % 10000}",
+                    f"+491{rng.randint(100000000, 999999999)}",
                 ),
             )
             inserted_member_ids.append(cursor.lastrowid)

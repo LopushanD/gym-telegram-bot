@@ -40,11 +40,6 @@ from src.key_service import (
     TakeFromMailboxStatus,
     take_key_from_mailbox,
 )
-from src.messages import (
-    UNKNOWN_CALLBACK_ANSWER,
-    KEY_OBTAINED_CANCELLED_ANSWER,
-    current_key_holder_text,
-)
 from src.telegram_helpers import get_callback_user_id, get_update_user_id
 
 CallbackHandler = Callable[[CallbackQuery, Message], Awaitable[None]]
@@ -53,7 +48,7 @@ CallbackHandler = Callable[[CallbackQuery, Message], Awaitable[None]]
 async def start_state_command_handler(update: Update, context) -> None:
     await reply_with_start_state(
         update.effective_message,
-        messages.START_STATE_TEXT,
+        messages.START_USER_MENU_TEXT,
         telegram_user_id=get_update_user_id(update),
     )
 
@@ -69,9 +64,9 @@ async def callback_query_handler(update: Update,context) -> None:
 async def handle_key_request(query: CallbackQuery, message: Message) -> None:
     holder = get_key_holder(DEFAULT_DATABASE_PATH, key_id=DEFAULT_KEY_ID)
     if holder is None:
-        text = messages.START_STATE_TEXT
+        text = messages.START_USER_MENU_TEXT
     else:
-        text = current_key_holder_text(holder)
+        text = messages.current_key_holder_text(holder)
     await edit_to_start_state(
         message,
         text,
@@ -92,11 +87,11 @@ async def handle_key_obtained_confirmation(query: CallbackQuery,message: Message
 
 async def handle_key_obtained_cancellation(query: CallbackQuery,message: Message) -> None:
     await query.answer()
-    await edit_to_start_state(query.message,messages.START_STATE_TEXT,query.from_user.id)
+    await edit_to_start_state(query.message,messages.START_USER_MENU_TEXT,query.from_user.id)
 
 async def handle_unknown_callback(query: CallbackQuery, message: Message) -> None:
     await query.answer()
-    await edit_to_start_state(message,UNKNOWN_CALLBACK_ANSWER,
+    await edit_to_start_state(message,messages.CALLBACK_USER_UNKNOWN_TEXT,
                                  telegram_user_id=get_callback_user_id(query)
     )
     
@@ -107,39 +102,39 @@ async def handle_holder_key_handover_cancellation(query: CallbackQuery, message:
 async def handle_key_return_mailbox(query: CallbackQuery, message: Message) -> None:
     await query.answer()
     await message.edit_text(
-        messages.KEY_RETURN_MAILBOX_CONFIRMATION_PROMPT,
+        messages.MAILBOX_HOLDER_RETURN_PROMPT,
         reply_markup=build_key_return_mailbox_confirmation_keyboard())
 
 async def handle_key_return_mailbox_confirmation(query: CallbackQuery,message: Message) -> None:
     telegram_user_id = get_callback_user_id(query)
     result = return_key_to_mailbox(DEFAULT_DATABASE_PATH, telegram_user_id, DEFAULT_KEY_ID)
     if result.status == ReturnToMailboxStatus.RETURNED:
-        reply = messages.KEY_RETURNED_TO_MAILBOX_ANSWER
+        reply = messages.MAILBOX_HOLDER_RETURNED_TEXT
     else:
-        reply = messages.KEY_RETURN_MAILBOX_NOT_ALLOWED_ANSWER
+        reply = messages.MAILBOX_HOLDER_BLOCKED_TEXT
     await query.answer()
     await edit_to_start_state(message,reply,telegram_user_id)
 
 async def handle_key_return_mailbox_cancellation(query: CallbackQuery,message: Message) -> None:
     await query.answer()
-    await edit_to_start_state(message,messages.KEY_RETURN_MAILBOX_CANCELLED_ANSWER,
+    await edit_to_start_state(message,messages.MAILBOX_HOLDER_CANCELLED_TEXT,
         get_callback_user_id(query))
 
 async def handle_key_obtained_from_mailbox(query: CallbackQuery,message: Message) -> None:
     await query.answer()
     await message.edit_text(
-        messages.KEY_TAKE_MAILBOX_CONFIRMATION_PROMPT,
+        messages.MAILBOX_RECEIVER_TAKE_PROMPT,
         reply_markup=build_key_obtained_mailbox_confirmation_keyboard())
 
 async def handle_key_obtained_from_mailbox_confirmation(query: CallbackQuery,message: Message) -> None:
     telegram_user_id = get_callback_user_id(query)
     result = take_key_from_mailbox(DEFAULT_DATABASE_PATH,telegram_user_id,DEFAULT_KEY_ID,MAILBOX_MEMBER_ID)
     if result.status == TakeFromMailboxStatus.TAKEN:
-        reply = messages.KEY_TAKEN_FROM_MAILBOX_ANSWER
+        reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT
     elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
-        reply = messages.KEY_NOT_IN_MAILBOX_ANSWER
+        reply = messages.MAILBOX_RECEIVER_EMPTY_TEXT
     else:
-        reply = messages.UNREGISTERED_USER_ANSWER
+        reply = messages.AUTH_USER_UNREGISTERED_TEXT
     await query.answer()
     await edit_to_start_state(message, reply, telegram_user_id)
 
@@ -147,7 +142,7 @@ async def handle_key_obtained_from_mailbox_cancellation(query: CallbackQuery,mes
     await query.answer()
     await edit_to_start_state(
         message,
-        messages.KEY_TAKE_MAILBOX_CANCELLED_ANSWER,
+        messages.MAILBOX_RECEIVER_CANCELLED_TEXT,
         get_callback_user_id(query))
 
 CALLBACK_HANDLERS: dict[str, CallbackHandler] = {

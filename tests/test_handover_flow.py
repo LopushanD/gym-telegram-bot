@@ -53,7 +53,7 @@ class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
         )
         state_change_function.assert_awaited_once_with(
             pending_message,
-            "The key was handed over from Member One to Member Two.",
+            "Recorded: Member Two received the key from Member One.",
             123,
         )
         await asyncio.sleep(0)

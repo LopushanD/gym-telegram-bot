@@ -47,10 +47,10 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
             await bot.handle_key_obtained_from_mailbox(query, message)
 
         take_key_from_mailbox.assert_not_called()
-        query.answer.assert_awaited_once_with(messages.PLEASE_CONFIRM_KEY_OBTAINED)
+        query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
         args, kwargs = message.edit_text.call_args
-        self.assertEqual((messages.KEY_TAKE_MAILBOX_CONFIRMATION_PROMPT,), args)
+        self.assertEqual((messages.MAILBOX_RECEIVER_TAKE_PROMPT,), args)
         self.assertIn("reply_markup", kwargs)
 
     async def test_take_from_mailbox_confirm_updates_holder(self):
@@ -67,6 +67,7 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
             bot.DEFAULT_DATABASE_PATH,
             123,
             bot.DEFAULT_KEY_ID,
+            bot.MAILBOX_MEMBER_ID,
         )
         query.answer.assert_awaited_once_with()
 

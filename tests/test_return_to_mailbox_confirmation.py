@@ -47,10 +47,10 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
             await bot.handle_key_return_mailbox(query, message)
 
         return_key_to_mailbox.assert_not_called()
-        query.answer.assert_awaited_once_with(messages.PLEASE_CONFIRM_KEY_OBTAINED)
+        query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
         args, kwargs = message.edit_text.call_args
-        self.assertEqual((messages.KEY_RETURN_MAILBOX_CONFIRMATION_PROMPT,), args)
+        self.assertEqual((messages.MAILBOX_HOLDER_RETURN_PROMPT,), args)
         self.assertIn("reply_markup", kwargs)
 
     async def test_return_to_mailbox_confirm_updates_holder(self):

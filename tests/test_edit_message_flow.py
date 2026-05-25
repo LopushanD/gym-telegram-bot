@@ -31,7 +31,7 @@ class EditMessageFlowTests(unittest.IsolatedAsyncioTestCase):
         message.edit_text.assert_awaited_once()
         args, kwargs = message.edit_text.call_args
 
-        self.assertEqual((messages.UNKNOWN_CALLBACK_ANSWER,), args)
+        self.assertEqual((messages.CALLBACK_USER_UNKNOWN_TEXT,), args)
         self.assertIn("reply_markup", kwargs)
 
 
