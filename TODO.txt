@@ -1,5 +1,11 @@
 - Simplify confirmation messages, so that there's no custom message for each confirmation
 - Think about better messages. Current ones are somewhat inconsistenct and might be missleading
+- add contact info when requesting key (so that people could contact each other easily). Think about making syncron and asyncron contacts possible.
+- add possibility to work with multiple keys (each key is independent)
+        -> implement additional dialogue, which asks which key (for each way of taking/returning/handing over the key) with following confirmation
+
+-find where the bot could life (given that it might need to be updated/restarted)
+- pack everything in container
 - when key is given over the name of new holder comes form telegram, but when "requesting"
 the key, message comes from database.
 example: "The key was handed over from Test to AJ" 
