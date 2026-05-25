@@ -107,7 +107,6 @@ async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,m
     if reply is not None:
         await answer_with_function(query, reply, message,reply, telegram_user_id, state_change_function)
     else:
-        await query.answer()
         prompt = messages.HANDOVER_RECEIVER_CONFIRM_PROMPT.format(
             from_member=pending_handover.holder_display_name,
         )
@@ -151,7 +150,6 @@ async def complete_handover_interaction(
         from_member=pending_handover.holder_display_name,
         to_member=get_callback_user_display_name(query),
     )
-    # answered in bot -> await query.answer(messages.HANDOVER_BOTH_COMPLETED_TEXT)
     await pending_handover.state_change_function(
         pending_handover.message, handover_text, pending_handover.holder_user_id,
     )
