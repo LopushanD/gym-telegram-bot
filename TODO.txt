@@ -1,10 +1,12 @@
-- add contact info when requesting key (so that people could contact each other easily). Think about making syncron and asyncron contacts possible.
-- add possibility to work with multiple keys (each key is independent)
-        -> implement additional dialogue, which asks which key (for each way of taking/returning/handing over the key) with following confirmation
-
+- Reengineer the way handlers are stored
+- add possibility to deactivate keys
+- Add information about where to report bugs.
 -find where the bot could life (given that it might need to be updated/restarted)
 - get holders for papers for keychains (to write what key has which id)
 - pack everything in container
+- Test on someone if everything is intuitive
+- write technical documentation
+- make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
 - when key is given over the name of new holder comes form telegram, but when "requesting"
 the key, message comes from database.
 example: "The key was handed over from Test to AJ" 

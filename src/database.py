@@ -35,8 +35,8 @@ def initialize_database(database_path):
             """
             CREATE TABLE IF NOT EXISTS gym_members (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                telegram_user_id BIGINT UNIQUE,
-                name TEXT,
+                telegram_user_id BIGINT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
                 surname TEXT NOT NULL,
                 room_number INTEGER NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,8 +50,10 @@ def initialize_database(database_path):
             CREATE TABLE IF NOT EXISTS keys (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 current_holder_id INTEGER NOT NULL,
+                owner_member_id INTEGER NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (current_holder_id) REFERENCES gym_members(id)
+                FOREIGN KEY (current_holder_id) REFERENCES gym_members(id),
+                FOREIGN KEY (owner_member_id) REFERENCES gym_members(id)
             )
             """
         )
@@ -68,7 +70,6 @@ def initialize_database(database_path):
             )
             """
         )
-
 
 def change_key_holder(database_path, key_id, new_holder_id):
     """Change a key holder and append the change to holder history."""
@@ -105,11 +106,38 @@ def change_key_holder(database_path, key_id, new_holder_id):
             (key_id, new_holder_id),
         )
 
-def get_current_key_holder_info(database_path, key_id, telegram_user_id=None,
+def get_key_owner_mailbox_info(database_path, key_id):
+    query = """
+        SELECT gm.id, gm.room_number
+        FROM keys
+        JOIN gym_members gm
+            ON keys.owner_member_id = gm.id
+        WHERE keys.id = ?
+    """
+    with sqlite3.connect(database_path) as connection:
+        return connection.execute(query, [key_id]).fetchone()
+
+def get_key_return_instruction_info(database_path, telegram_user_id):
+    query = """
+        SELECT keys.id, mailbox.room_number
+        FROM keys
+        JOIN gym_members holder
+            ON keys.current_holder_id = holder.id
+        JOIN gym_members mailbox
+            ON keys.owner_member_id = mailbox.id
+        WHERE holder.telegram_user_id = ?
+        ORDER BY keys.id
+        LIMIT 1
+    """
+    with sqlite3.connect(database_path) as connection:
+        return connection.execute(query, [telegram_user_id]).fetchone()
+
+def get_current_keyholder_info(database_path, key_id, telegram_user_id=None,
                                 gym_member_id=None):
     """Return the current holder details for a key, or None if the key is missing."""
     query = """
         SELECT
+            keys.id,
             gym_members.name,
             gym_members.surname,
             gym_members.room_number,
@@ -133,6 +161,70 @@ def get_current_key_holder_info(database_path, key_id, telegram_user_id=None,
         connection.execute("PRAGMA foreign_keys = ON")
         return connection.execute(query, parameters).fetchone()
 
+#TODO This function does almost the same as get-key_return_instruction_info. They could be combined into single fuction. 
+# Think about it
+def get_key_id_by_telegram_user_id(database_path, telegram_user_id):
+    """Return the first key id currently held by a Telegram user, or None."""
+    query = """
+        SELECT keys.id
+        FROM keys
+        JOIN gym_members
+            ON keys.current_holder_id = gym_members.id
+        WHERE gym_members.telegram_user_id = ?
+    """
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        key = connection.execute(query, [telegram_user_id]).fetchone()
+    if key is None:
+        return None
+    return key[0]
+
+def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_member_id=None):
+    """Return current holder details for all keys."""
+    query = """
+        SELECT
+            keys.id,
+            gym_members.name,
+            gym_members.surname,
+            gym_members.room_number,
+            gym_members.telegram_name,
+            gym_members.phone_number
+        FROM keys
+        JOIN gym_members ON gym_members.id = keys.current_holder_id
+    """
+    conditions = []
+    parameters = []
+
+    if telegram_user_id is not None:
+        conditions.append("gym_members.telegram_user_id = ?")
+        parameters.append(telegram_user_id)
+
+    if gym_member_id is not None:
+        conditions.append("gym_members.id = ?")
+        parameters.append(gym_member_id)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY keys.id"
+
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection.execute(query, parameters).fetchall()
+
+
+def get_key_count(database_path):
+    """Return the number of tracked keys."""
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        row = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM keys
+            """
+        ).fetchone()
+    return row[0]
+
 def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
     """Return the gym member id for a Telegram user, or None if absent."""
     with sqlite3.connect(database_path) as connection:
@@ -150,7 +242,6 @@ def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
         return None
 
     return member[0]
-
 
 def populate_members_table_with_mock_data(database_path,n_members,rng=None):
     """Populate the members table with random plausible mock members."""

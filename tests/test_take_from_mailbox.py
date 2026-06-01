@@ -15,7 +15,7 @@ from src.key_service import (
 class TakeFromMailboxTests(unittest.TestCase):
     def test_take_key_from_mailbox_updates_holder_to_member(self):
         with (
-            patch("src.key_service.get_current_key_holder_info", return_value=("Mailbox", "", 0)),
+            patch("src.key_service.get_current_keyholder_info", return_value=(1, "Mailbox", "", 0, None, None)),
             patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
@@ -26,7 +26,7 @@ class TakeFromMailboxTests(unittest.TestCase):
 
     def test_take_key_from_mailbox_rejects_when_key_is_not_in_mailbox(self):
         with (
-            patch("src.key_service.get_current_key_holder_info", return_value=None),
+            patch("src.key_service.get_current_keyholder_info", return_value=None),
             patch("src.key_service.get_gym_member_id_by_telegram_user_id") as get_member_id,
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
@@ -38,7 +38,7 @@ class TakeFromMailboxTests(unittest.TestCase):
 
     def test_take_key_from_mailbox_rejects_missing_telegram_user(self):
         with (
-            patch("src.key_service.get_current_key_holder_info", return_value=("Mailbox", "", 0)),
+            patch("src.key_service.get_current_keyholder_info", return_value=(1, "Mailbox", "", 0, None, None)),
             patch("src.key_service.get_gym_member_id_by_telegram_user_id") as get_member_id,
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
@@ -50,7 +50,7 @@ class TakeFromMailboxTests(unittest.TestCase):
 
     def test_take_key_from_mailbox_rejects_unregistered_user(self):
         with (
-            patch("src.key_service.get_current_key_holder_info", return_value=("Mailbox", "", 0)),
+            patch("src.key_service.get_current_keyholder_info", return_value=(1, "Mailbox", "", 0, None, None)),
             patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=None),
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):

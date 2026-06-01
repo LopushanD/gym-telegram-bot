@@ -12,6 +12,7 @@ from src.messages import current_key_holder_text
 class MessageTests(unittest.TestCase):
     def test_current_key_holder_text_includes_contact_details_when_present(self):
         holder = KeyHolder(
+            key_id=1,
             name="Dima",
             surname="Ivanov",
             room_number=1234,
@@ -21,6 +22,7 @@ class MessageTests(unittest.TestCase):
 
         text = current_key_holder_text(holder)
 
+        self.assertIn("Key 1", text)
         self.assertIn("Dima Ivanov", text)
         self.assertIn("room 1234", text)
         self.assertIn("Telegram: @dima", text)
@@ -28,6 +30,7 @@ class MessageTests(unittest.TestCase):
 
     def test_current_key_holder_text_skips_missing_contact_details(self):
         holder = KeyHolder(
+            key_id=1,
             name="Dima",
             surname="Ivanov",
             room_number=1234,

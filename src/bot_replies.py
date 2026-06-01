@@ -1,18 +1,17 @@
 from telegram import Message
 
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH, DEFAULT_KEY_ID
-from src.key_service import user_currently_holds_key
+from src.config import DEFAULT_DATABASE_PATH
+from src.key_service import user_currently_holds_key,user_currently_holds_any_key
 from src.keyboards import build_key_handover_holder_keyboard, build_start_keyboard
 
 
 def build_start_state_markup(telegram_user_id: int | None = None):
     return build_start_keyboard(
-        include_holder_actions=user_currently_holds_key(
+        include_holder_actions=user_currently_holds_any_key(
             DEFAULT_DATABASE_PATH,
             telegram_user_id,
-            DEFAULT_KEY_ID,
-        ),
+        )
     )
 
 async def reply_with_start_state(

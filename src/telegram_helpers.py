@@ -8,7 +8,7 @@ def get_update_user_id(update: Update) -> int | None:
     return user.id
 
 
-def get_callback_user_id(query: CallbackQuery) -> int | None:
+def get_callback_telegram_user_id(query: CallbackQuery) -> int | None:
     user = getattr(query, "from_user", None)
     if user is None:
         return None

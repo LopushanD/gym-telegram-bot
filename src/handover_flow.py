@@ -11,7 +11,7 @@ from src.keyboards import build_key_obtained_receiver_confirmation_keyboard
 from src.key_service import user_currently_holds_key
 from src.telegram_helpers import (
     get_callback_user_display_name,
-    get_callback_user_id,
+    get_callback_telegram_user_id,
     messages_are_from_same_chat,
 )
 
@@ -69,7 +69,7 @@ def get_pending_handover(key_id) -> PendingHandover | None:
     return pending_handover
 
 async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> None:
-    telegram_user_id = get_callback_user_id(query)
+    telegram_user_id = get_callback_telegram_user_id(query)
     if not user_currently_holds_key(DEFAULT_DATABASE_PATH, telegram_user_id, key_id):
         reply = messages.HANDOVER_HOLDER_BLOCKED_TEXT
     elif key_id in PENDING_HANDOVERS:
@@ -96,12 +96,12 @@ async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state
 
 async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> bool:
     pending_handover = PENDING_HANDOVERS.get(key_id)
-    telegram_user_id = get_callback_user_id(query)
+    telegram_user_id = get_callback_telegram_user_id(query)
     reply = None
     if telegram_user_id is None:
         reply = messages.AUTH_USER_MISSING_TEXT
     elif pending_handover is None:
-        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT  
+        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT.format(key_id=key_id)  
     elif telegram_user_id == pending_handover.holder_user_id:
         reply = messages.HANDOVER_RECEIVER_SELF_TEXT
     if reply is not None:
@@ -112,16 +112,17 @@ async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,m
         )
         await message.edit_text(
             prompt,
-            reply_markup=build_key_obtained_receiver_confirmation_keyboard(),
+            reply_markup=build_key_obtained_receiver_confirmation_keyboard(key_id),
         )
-
+#TODO: Seemms like the function above and below do some checks twice. the one below follows after the one above
+# Decide which one does what checks (simplify the overall flow)
 async def handle_pending_handover_confirmation(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> bool:
-    telegram_user_id = get_callback_user_id(query)
+    telegram_user_id = get_callback_telegram_user_id(query)
     reply = None
     member_id = None
     pending_handover = get_pending_handover(key_id)
     if pending_handover is None:
-        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT
+        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT.format(key_id=key_id)
     elif telegram_user_id is None:
         reply = messages.AUTH_USER_MISSING_TEXT
     else:
@@ -157,7 +158,7 @@ async def complete_handover_interaction(
         return
 
     await pending_handover.state_change_function(
-        query.message, handover_text, get_callback_user_id(query)
+        query.message, handover_text, get_callback_telegram_user_id(query)
     )
     
 
@@ -167,7 +168,8 @@ async def handle_pending_handover_cancellation(
     message: Message,
 ) -> None:
     pending_handover = get_pending_handover(key_id)
-    PENDING_HANDOVERS.pop(key_id, None)
-    pending_handover.timeout_task.cancel()
-    await edit_to_start_state(message,messages.HANDOVER_HOLDER_CANCELLED_TEXT,get_callback_user_id(query))
+    if pending_handover is not None:
+        PENDING_HANDOVERS.pop(key_id, None)
+        pending_handover.timeout_task.cancel()
+    await edit_to_start_state(message,messages.HOLDER_CHANGE_CANCELLED_TEXT,get_callback_telegram_user_id(query))
         
