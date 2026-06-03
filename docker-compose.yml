@@ -1,0 +1,19 @@
+services:
+  gym-telegram-bot:
+    build: .
+    environment:
+      DATABASE_PATH: /app/data/gym_bot.sqlite3
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN before starting the bot}
+    # For more convenient work with database during development.
+    volumes:
+      - ./data:/app/data
+    working_dir: /app
+    restart: unless-stopped
+
+    # For actual deployment, use a named Docker volume instead:
+#     volumes:
+#       - gym_bot_data:/app/data
+
+# volumes:
+#   gym_bot_data:
+  

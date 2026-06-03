@@ -1,5 +1,4 @@
 ---------- FIRST PRIORITY ----------
-- pack everything in container
 - Add information about where to report bugs.
 -find where the bot could life (given that it might need to be updated/restarted)
 ---------- SECOND PRIORITY ----------
