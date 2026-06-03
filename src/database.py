@@ -27,6 +27,28 @@ SURNAMES = (
     "Weber",
 )
 
+TEST_MAILBOXES = (
+    {
+        "telegram_user_id": 0,
+        "name": "Dima's",
+        "surname": "Mailbox",
+        "room_number": 1001,
+    },
+    {
+        "telegram_user_id": -1,
+        "name": "Second",
+        "surname": "Mailbox",
+        "room_number": 3062,
+    },
+    {
+        "telegram_user_id": -2,
+        "name": "Last",
+        "surname": "Mailbox",
+        "room_number": 9999,
+    },
+)
+
+
 def initialize_database(database_path):
     """Create the application database tables if they do not exist yet."""
     with sqlite3.connect(database_path) as connection:
@@ -41,7 +63,8 @@ def initialize_database(database_path):
                 room_number INTEGER NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 telegram_name TEXT,
-                phone_number TEXT
+                phone_number TEXT,
+                is_admin INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -51,6 +74,7 @@ def initialize_database(database_path):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 current_holder_id INTEGER NOT NULL,
                 owner_member_id INTEGER NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (current_holder_id) REFERENCES gym_members(id),
                 FOREIGN KEY (owner_member_id) REFERENCES gym_members(id)
@@ -299,6 +323,74 @@ def populate_members_table_with_mock_data(database_path,n_members,rng=None):
     return inserted_member_ids
 
 
+def populate_test_mailboxes_and_keys(database_path):
+    """Populate deterministic mailbox members and one key per mailbox."""
+    mailbox_member_ids = []
+    key_ids = []
+
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+
+        for mailbox in TEST_MAILBOXES:
+            existing_mailbox = connection.execute(
+                """
+                SELECT id
+                FROM gym_members
+                WHERE telegram_user_id = ?
+                """,
+                (mailbox["telegram_user_id"],),
+            ).fetchone()
+
+            if existing_mailbox is None:
+                mailbox_member_id = connection.execute(
+                    """
+                    INSERT INTO gym_members (
+                        telegram_user_id,
+                        name,
+                        surname,
+                        room_number
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        mailbox["telegram_user_id"],
+                        mailbox["name"],
+                        mailbox["surname"],
+                        mailbox["room_number"],
+                    ),
+                ).lastrowid
+            else:
+                mailbox_member_id = existing_mailbox[0]
+
+            mailbox_member_ids.append(mailbox_member_id)
+
+            existing_key = connection.execute(
+                """
+                SELECT id
+                FROM keys
+                WHERE owner_member_id = ?
+                ORDER BY id
+                LIMIT 1
+                """,
+                (mailbox_member_id,),
+            ).fetchone()
+
+            if existing_key is None:
+                key_id = connection.execute(
+                    """
+                    INSERT INTO keys (current_holder_id, owner_member_id)
+                    VALUES (?, ?)
+                    """,
+                    (mailbox_member_id, mailbox_member_id),
+                ).lastrowid
+            else:
+                key_id = existing_key[0]
+
+            key_ids.append(key_id)
+
+    return mailbox_member_ids, key_ids
+
+
 def _generate_unique_telegram_user_id(rng, used_telegram_user_ids):
     while True:
         telegram_user_id = rng.randint(100_000_000, 999_999_999)
@@ -310,3 +402,4 @@ def _generate_unique_telegram_user_id(rng, used_telegram_user_ids):
 if __name__ == "__main__":
     initialize_database(DEFAULT_DATABASE_PATH)
     populate_members_table_with_mock_data(DEFAULT_DATABASE_PATH, 5,None)
+    populate_test_mailboxes_and_keys(DEFAULT_DATABASE_PATH)

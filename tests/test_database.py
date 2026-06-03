@@ -19,6 +19,7 @@ from src.database import (
     initialize_database,
     change_key_holder,
     populate_members_table_with_mock_data,
+    populate_test_mailboxes_and_keys,
 )
 
 
@@ -377,6 +378,75 @@ class DatabaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "n_members must not be negative"):
                 initialize_database(database_path)
                 populate_members_table_with_mock_data(database_path, n_members=-1)
+
+    def test_populate_test_mailboxes_and_keys_creates_mailboxes_and_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            mailbox_ids, key_ids = populate_test_mailboxes_and_keys(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                mailboxes = connection.execute(
+                    """
+                    SELECT
+                        id,
+                        telegram_user_id,
+                        name,
+                        surname,
+                        room_number,
+                        telegram_name,
+                        phone_number
+                    FROM gym_members
+                    ORDER BY id
+                    """
+                ).fetchall()
+                keys = connection.execute(
+                    """
+                    SELECT id, current_holder_id, owner_member_id, is_active
+                    FROM keys
+                    ORDER BY id
+                    """
+                ).fetchall()
+
+            self.assertEqual(
+                [
+                    (mailbox_ids[0], 0, "Dima's", "Mailbox", 1001, None, None),
+                    (mailbox_ids[1], -1, "Second", "Mailbox", 3062, None, None),
+                    (mailbox_ids[2], -2, "Last", "Mailbox", 9999, None, None),
+                ],
+                mailboxes,
+            )
+            self.assertEqual(
+                [
+                    (key_ids[0], mailbox_ids[0], mailbox_ids[0], 1),
+                    (key_ids[1], mailbox_ids[1], mailbox_ids[1], 1),
+                    (key_ids[2], mailbox_ids[2], mailbox_ids[2], 1),
+                ],
+                keys,
+            )
+
+    def test_populate_test_mailboxes_and_keys_can_run_more_than_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            first_result = populate_test_mailboxes_and_keys(database_path)
+            second_result = populate_test_mailboxes_and_keys(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                mailbox_count = connection.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM gym_members
+                    WHERE surname = 'Mailbox'
+                    """
+                ).fetchone()[0]
+                key_count = connection.execute("SELECT COUNT(*) FROM keys").fetchone()[0]
+
+            self.assertEqual(first_result, second_result)
+            self.assertEqual(3, mailbox_count)
+            self.assertEqual(3, key_count)
 
     def test_get_current_key_holder_returns_holder_details(self):
         with tempfile.TemporaryDirectory() as directory:

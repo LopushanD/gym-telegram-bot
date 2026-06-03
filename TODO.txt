@@ -1,12 +1,18 @@
-- Reengineer the way handlers are stored
-- add possibility to deactivate keys
+---------- FIRST PRIORITY ----------
+- pack everything in container
 - Add information about where to report bugs.
 -find where the bot could life (given that it might need to be updated/restarted)
-- get holders for papers for keychains (to write what key has which id)
-- pack everything in container
-- Test on someone if everything is intuitive
+---------- SECOND PRIORITY ----------
+- Add admin convenient usage of admin features
+        - add possibility to deactivate keys 
+        - add posibility for admin to manually adjust the key status
 - write technical documentation
+- Test on someone if everything is intuitive
+- get holders for papers for keychains (to write what key has which id)
+- Reengineer the way handlers are stored
+---------- THIRD PRIORITY ----------
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
+- Add convenient key history lookup
 - when key is given over the name of new holder comes form telegram, but when "requesting"
 the key, message comes from database.
 example: "The key was handed over from Test to AJ" 
