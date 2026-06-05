@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.config import DEFAULT_DATABASE_PATH
+from src.models import GymMember, KeyHolder
 from src.database import (
     change_key_holder,
     get_current_keyholder_info,
@@ -11,15 +12,6 @@ from src.database import (
     get_gym_member_id_by_telegram_user_id,
     get_key_owner_mailbox_info
 )
-
-@dataclass(frozen=True)
-class KeyHolder:
-    key_id: int
-    name: str
-    surname: str
-    room_number: int
-    telegram_name: str | None
-    phone_number: str | None
 
 @dataclass(frozen=True)
 class KeyReturnInstruction:
@@ -62,12 +54,7 @@ def get_keyholders(database_path)-> list[KeyHolder]:
     holders = get_all_current_keyholders_info(database_path)
     if not holders:
         return None
-    keyholders = []
-    for holder in holders:
-        key_id, name, surname, room_number, telegram_name, phone_number = holder
-        keyholder = KeyHolder(key_id,name,surname,room_number,telegram_name,phone_number)
-        keyholders.append(keyholder)
-    return keyholders
+    return holders
 
 
 def get_tracked_key_count(database_path) -> int:
@@ -103,8 +90,8 @@ def can_start_key_handover(database_path, telegram_user_id, key_id):
 
 def return_key_to_mailbox(database_path,telegram_user_id,key_id):
     if user_currently_holds_key(database_path, telegram_user_id, key_id):
-        mailbox_id,_ = get_key_owner_mailbox_info(DEFAULT_DATABASE_PATH,key_id)
-        change_key_holder(database_path, key_id,mailbox_id)
+        mailbox = get_key_owner_mailbox_info(DEFAULT_DATABASE_PATH, key_id)
+        change_key_holder(database_path, key_id, mailbox.id)
         return ReturnToMailboxResult(status=ReturnToMailboxStatus.RETURNED)
     return ReturnToMailboxResult(status=ReturnToMailboxStatus.NOT_CURRENT_HOLDER)
 

@@ -147,7 +147,7 @@ def build_key_return_mailbox_returned_keyboard(key_id: int) -> InlineKeyboardMar
     keyboard = [
         [
             InlineKeyboardButton(
-                "Returned",
+                "Key returned",
                 callback_data=mailbox_key_return_choice_callback(key_id),
             )
         ],

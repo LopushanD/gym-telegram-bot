@@ -11,6 +11,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.database import (
     get_all_current_keyholders_info,
     get_current_keyholder_info,
+    get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
     get_key_id_by_telegram_user_id,
     get_key_count,
@@ -21,6 +22,7 @@ from src.database import (
     populate_members_table_with_mock_data,
     populate_test_mailboxes_and_keys,
 )
+from src.models import GymMember, KeyHolder
 
 
 def create_gym_member(
@@ -288,15 +290,37 @@ class DatabaseTests(unittest.TestCase):
             initialize_database(database_path)
 
             with sqlite3.connect(database_path) as connection:
-                owner_id = create_gym_member(connection, "Ivanov", 101)
-                new_holder_id = create_gym_member(connection, "Petrov", 102)
+                owner_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    123456,
+                    "Ivanov",
+                    101,
+                )
+                new_holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    654321,
+                    "Petrov",
+                    102,
+                )
                 key_id = create_key(connection, owner_id)
 
             change_key_holder(database_path, key_id, new_holder_id)
 
             owner = get_key_owner_mailbox_info(database_path, key_id)
 
-            self.assertEqual((owner_id, 101), owner)
+            self.assertEqual(
+                GymMember(
+                    id=owner_id,
+                    telegram_user_id=123456,
+                    name="Alex",
+                    surname="Ivanov",
+                    room_number=101,
+                    telegram_name=None,
+                    phone_number=None,
+                    is_admin=False,
+                ),
+                owner,
+            )
 
     def test_change_key_holder_rejects_missing_holder(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -454,8 +478,9 @@ class DatabaseTests(unittest.TestCase):
             initialize_database(database_path)
 
             with sqlite3.connect(database_path) as connection:
-                holder_id = create_gym_member(
+                holder_id = create_gym_member_with_telegram_user_id(
                     connection,
+                    123456,
                     "Ivanov",
                     1234,
                     name="Dima",
@@ -466,7 +491,22 @@ class DatabaseTests(unittest.TestCase):
 
             holder = get_current_keyholder_info(database_path, key_id)
 
-            self.assertEqual((key_id, "Dima", "Ivanov", 1234, "@dima", "+49123456789"), holder)
+            self.assertEqual(
+                KeyHolder(
+                    key_id=key_id,
+                    member=GymMember(
+                        id=holder_id,
+                        telegram_user_id=123456,
+                        name="Dima",
+                        surname="Ivanov",
+                        room_number=1234,
+                        telegram_name="@dima",
+                        phone_number="+49123456789",
+                        is_admin=False,
+                    ),
+                ),
+                holder,
+            )
 
     def test_get_all_current_keyholders_returns_key_ids_with_holder_details(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -474,16 +514,18 @@ class DatabaseTests(unittest.TestCase):
             initialize_database(database_path)
 
             with sqlite3.connect(database_path) as connection:
-                first_holder_id = create_gym_member(
+                first_holder_id = create_gym_member_with_telegram_user_id(
                     connection,
+                    123456,
                     "Ivanov",
                     1234,
                     name="Dima",
                     telegram_name="@dima",
                     phone_number="+49123456789",
                 )
-                second_holder_id = create_gym_member(
+                second_holder_id = create_gym_member_with_telegram_user_id(
                     connection,
+                    654321,
                     "Petrov",
                     4321,
                     name="Alex",
@@ -497,8 +539,32 @@ class DatabaseTests(unittest.TestCase):
 
             self.assertEqual(
                 [
-                    (first_key_id, "Dima", "Ivanov", 1234, "@dima", "+49123456789"),
-                    (second_key_id, "Alex", "Petrov", 4321, "@alex", "+49987654321"),
+                    KeyHolder(
+                        key_id=first_key_id,
+                        member=GymMember(
+                            id=first_holder_id,
+                            telegram_user_id=123456,
+                            name="Dima",
+                            surname="Ivanov",
+                            room_number=1234,
+                            telegram_name="@dima",
+                            phone_number="+49123456789",
+                            is_admin=False,
+                        ),
+                    ),
+                    KeyHolder(
+                        key_id=second_key_id,
+                        member=GymMember(
+                            id=second_holder_id,
+                            telegram_user_id=654321,
+                            name="Alex",
+                            surname="Petrov",
+                            room_number=4321,
+                            telegram_name="@alex",
+                            phone_number="+49987654321",
+                            is_admin=False,
+                        ),
+                    ),
                 ],
                 holders,
             )
@@ -535,7 +601,22 @@ class DatabaseTests(unittest.TestCase):
                 telegram_user_id=123456,
             )
 
-            self.assertEqual((key_id, "Dima", "Ivanov", 1234, "@dima", "+49123456789"), holder)
+            self.assertEqual(
+                KeyHolder(
+                    key_id=key_id,
+                    member=GymMember(
+                        id=holder_id,
+                        telegram_user_id=123456,
+                        name="Dima",
+                        surname="Ivanov",
+                        room_number=1234,
+                        telegram_name="@dima",
+                        phone_number="+49123456789",
+                        is_admin=False,
+                    ),
+                ),
+                holder,
+            )
 
     def test_get_current_key_holder_returns_none_when_telegram_user_is_not_holder(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -590,6 +671,30 @@ class DatabaseTests(unittest.TestCase):
             )
 
             self.assertIsNone(member_id)
+
+    def test_get_gym_member_by_telegram_user_id_returns_registered_member_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                member_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    123456,
+                    "Database Surname",
+                    1234,
+                    name="Database Name",
+                    telegram_name="telegram_name",
+                    phone_number="12345",
+                )
+
+            member = get_gym_member_by_telegram_user_id(database_path, 123456)
+
+            self.assertEqual(member_id, member.id)
+            self.assertEqual("Database Name Database Surname", member.full_name)
+            self.assertEqual(1234, member.room_number)
+            self.assertEqual("telegram_name", member.telegram_name)
+            self.assertEqual("12345", member.phone_number)
 
     def test_get_key_id_by_telegram_user_id_returns_currently_held_key_id(self):
         with tempfile.TemporaryDirectory() as directory:

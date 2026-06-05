@@ -1,20 +1,26 @@
 ---------- FIRST PRIORITY ----------
-- Add information about where to report bugs.
+- Add admin convenient usage of admin features
+        * /givekey key_id telegram_id
+        * /returnkey key_id mailbox_room
+        * /keyhistory key_id [last n records]
+        * /activatekey key_id
+        * /deactivatekey key_id
+        * /keystatus key_id # full information about key status
+        * /keys # general information about keys
+        * /adduser telegram_id name surname room [telegram_name] [phone number]
+        * /deleteuser telegram_id
+        * /updateuser telegram_id [name] [surname] [room] [telegram_name] [phone number]
+        * /users [name] [surname] [room] # information about all users for give
+        * /help
+        
+- Update starting message, it should contain:
+        - information about where to report bugs.
+        - Contact information for information/suggestions/etc. 
 -find where the bot could life (given that it might need to be updated/restarted)
 ---------- SECOND PRIORITY ----------
-- Add admin convenient usage of admin features
-        - add possibility to deactivate keys 
-        - add posibility for admin to manually adjust the key status
 - write technical documentation
 - Test on someone if everything is intuitive
 - get holders for papers for keychains (to write what key has which id)
 - Reengineer the way handlers are stored
 ---------- THIRD PRIORITY ----------
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
-- Add convenient key history lookup
-- when key is given over the name of new holder comes form telegram, but when "requesting"
-the key, message comes from database.
-example: "The key was handed over from Test to AJ" 
-        but
-        "The key is currently held by Alex Johnes, room 1111"
-So, think through if it's okay and how to change It

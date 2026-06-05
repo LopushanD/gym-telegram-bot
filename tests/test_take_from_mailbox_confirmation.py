@@ -9,6 +9,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import bot, messages
 from src.key_service import TakeFromMailboxResult, TakeFromMailboxStatus
+from src.models import GymMember
 from src.keyboards import (
     RECEIVER_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX,
     RECEIVER_MAILBOX_KEY_OBTAINED_CANCEL_CALLBACK,
@@ -113,6 +114,7 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         handler.assert_awaited_once_with(query, message)
 
     async def test_take_from_mailbox_confirm_updates_holder(self):
+        mailbox_member_id = 1
         query, message = self.make_query(
             f"{RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX}:2",
         )
@@ -124,15 +126,24 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         ) as take_key_from_mailbox, patch.object(
             bot,
             "get_key_owner_mailbox_info",
-            return_value=(bot.MAILBOX_MEMBER_ID, 1234),
-        ):
+            return_value=GymMember(
+                id=mailbox_member_id,
+                telegram_user_id=0,
+                name="Mailbox",
+                surname="Owner",
+                room_number=1234,
+                telegram_name=None,
+                phone_number=None,
+                is_admin=False,
+            ),
+        ), patch.object(bot, "edit_to_start_state", new_callable=AsyncMock):
             await bot.handle_key_obtained_from_mailbox_confirmation(query, message)
 
         take_key_from_mailbox.assert_called_once_with(
             bot.DEFAULT_DATABASE_PATH,
             123,
             2,
-            bot.MAILBOX_MEMBER_ID,
+            mailbox_member_id,
         )
         query.answer.assert_awaited_once_with()
 

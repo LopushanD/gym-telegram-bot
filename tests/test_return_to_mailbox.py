@@ -6,6 +6,7 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.models import GymMember
 from src.key_service import (
     ReturnToMailboxStatus,
     return_key_to_mailbox,
@@ -16,6 +17,19 @@ class ReturnToMailboxTests(unittest.TestCase):
     def test_return_key_to_mailbox_updates_holder_to_mailbox_member(self):
         with (
             patch("src.key_service.user_currently_holds_key", return_value=True),
+            patch(
+                "src.key_service.get_key_owner_mailbox_info",
+                return_value=GymMember(
+                    id=1,
+                    telegram_user_id=0,
+                    name="Mailbox",
+                    surname="Owner",
+                    room_number=1234,
+                    telegram_name=None,
+                    phone_number=None,
+                    is_admin=False,
+                ),
+            ),
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
             result = return_key_to_mailbox("database.sqlite3", 123, key_id=1)

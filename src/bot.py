@@ -204,7 +204,7 @@ async def handle_key_return_mailbox_confirmation(query: CallbackQuery,message: M
     )
     result = return_key_to_mailbox(DEFAULT_DATABASE_PATH, telegram_user_id, key_id)
     if result.status == ReturnToMailboxStatus.RETURNED:
-        reply = messages.MAILBOX_HOLDER_RETURNED_TEXT
+        reply = messages.MAILBOX_HOLDER_RETURNED_TEXT.format(key_id=key_id)
     else:
         reply = messages.MAILBOX_HOLDER_BLOCKED_TEXT
     await query.answer()
@@ -242,12 +242,12 @@ async def handle_key_obtained_from_mailbox_confirmation(query: CallbackQuery,mes
         query.data,
         RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX,
     )
-    mailbox_id, _ = get_key_owner_mailbox_info(DEFAULT_DATABASE_PATH,key_id)
-    result = take_key_from_mailbox(DEFAULT_DATABASE_PATH,telegram_user_id,key_id,mailbox_id)
+    mailbox = get_key_owner_mailbox_info(DEFAULT_DATABASE_PATH, key_id)
+    result = take_key_from_mailbox(DEFAULT_DATABASE_PATH,telegram_user_id,key_id,mailbox.id)
     if result.status == TakeFromMailboxStatus.TAKEN:
-        reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT
+        reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT.format(key_id=key_id)
     elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
-        reply = messages.MAILBOX_RECEIVER_EMPTY_TEXT
+        reply = messages.MAILBOX_RECEIVER_EMPTY_TEXT.format(key_id=key_id)
     else:
         reply = messages.AUTH_USER_UNREGISTERED_TEXT
     await query.answer()

@@ -6,6 +6,7 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.models import GymMember, KeyHolder
 from src.key_service import (
     HandoverStatus,
     KeyReturnInstruction,
@@ -21,17 +22,31 @@ class KeyServiceTests(unittest.TestCase):
     def test_get_keyholders_returns_domain_objects(self):
         with patch(
             "src.key_service.get_all_current_keyholders_info",
-            return_value=[(1, "Dima", "Ivanov", 1234, "@dima", "+49123456789")],
+            return_value=[
+                KeyHolder(
+                    key_id=1,
+                    member=GymMember(
+                        id=10,
+                        telegram_user_id=123,
+                        name="Dima",
+                        surname="Ivanov",
+                        room_number=1234,
+                        telegram_name="@dima",
+                        phone_number="+49123456789",
+                        is_admin=False,
+                    ),
+                )
+            ],
         ):
             holders = get_keyholders("database.sqlite3")
 
         holder = holders[0]
         self.assertEqual(1, holder.key_id)
-        self.assertEqual("Dima", holder.name)
-        self.assertEqual("Ivanov", holder.surname)
-        self.assertEqual(1234, holder.room_number)
-        self.assertEqual("@dima", holder.telegram_name)
-        self.assertEqual("+49123456789", holder.phone_number)
+        self.assertEqual("Dima", holder.member.name)
+        self.assertEqual("Ivanov", holder.member.surname)
+        self.assertEqual(1234, holder.member.room_number)
+        self.assertEqual("@dima", holder.member.telegram_name)
+        self.assertEqual("+49123456789", holder.member.phone_number)
 
     def test_get_keyholders_returns_none_when_no_keys_exist(self):
         with patch("src.key_service.get_all_current_keyholders_info", return_value=[]):
@@ -72,7 +87,19 @@ class KeyServiceTests(unittest.TestCase):
     def test_user_currently_holds_key_checks_holder_by_telegram_id(self):
         with patch(
             "src.key_service.get_current_keyholder_info",
-            return_value=(1, "Dima", "Ivanov", 1234, "@dima", "+49123456789"),
+            return_value=KeyHolder(
+                key_id=1,
+                member=GymMember(
+                    id=10,
+                    telegram_user_id=123,
+                    name="Dima",
+                    surname="Ivanov",
+                    room_number=1234,
+                    telegram_name="@dima",
+                    phone_number="+49123456789",
+                    is_admin=False,
+                ),
+            ),
         ) as get_current_keyholder_info:
             is_holder = user_currently_holds_key("database.sqlite3", 123, key_id=1)
 
