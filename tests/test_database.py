@@ -3,26 +3,34 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.database import (
+    GymMemberAlreadyExistsError,
+    add_gym_member,
     get_all_current_keyholders_info,
     get_current_keyholder_info,
     get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
+    get_gym_member_records,
     get_key_id_by_telegram_user_id,
     get_key_count,
+    get_key_history,
+    get_key_status,
     get_key_owner_mailbox_info,
     get_key_return_instruction_info,
     initialize_database,
     change_key_holder,
     populate_members_table_with_mock_data,
     populate_test_mailboxes_and_keys,
+    set_key_active,
+    update_gym_member,
 )
-from src.models import GymMember, KeyHolder
+from src.models import GymMember, KeyHolder, KeyStatus
 
 
 def create_gym_member(
@@ -283,6 +291,80 @@ class DatabaseTests(unittest.TestCase):
 
             self.assertEqual((second_holder_id,), current_holder_id)
             self.assertEqual((key_id, second_holder_id), history_record)
+
+    def test_get_key_history_returns_latest_records_with_member_details(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                first_holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    100,
+                    "Ivanov",
+                    101,
+                )
+                second_holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    200,
+                    "Petrov",
+                    102,
+                )
+                key_id = create_key(connection, first_holder_id)
+                connection.executemany(
+                    """
+                    INSERT INTO key_holder_history (key_id, holder_id, taken_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    [
+                        (key_id, first_holder_id, "2026-06-01 10:00:00"),
+                        (key_id, second_holder_id, "2026-06-02 10:00:00"),
+                    ],
+                )
+
+            records = get_key_history(database_path, key_id, limit=1)
+
+            self.assertEqual(1, len(records))
+            self.assertEqual(key_id, records[0].key_id)
+            self.assertEqual(second_holder_id, records[0].member.id)
+            self.assertEqual(datetime(2026, 6, 2, 10, 0), records[0].taken_at)
+
+    def test_get_key_history_rejects_non_positive_limit(self):
+        with self.assertRaises(ValueError):
+            get_key_history(":memory:", key_id=1, limit=0)
+
+    def test_get_key_history_filters_by_key_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    100,
+                    "Ivanov",
+                    101,
+                )
+                first_key_id = create_key(connection, holder_id)
+                second_key_id = create_key(connection, holder_id)
+                connection.executemany(
+                    """
+                    INSERT INTO key_holder_history (key_id, holder_id, taken_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    [
+                        (first_key_id, holder_id, "2026-06-01 10:00:00"),
+                        (second_key_id, holder_id, "2026-06-02 10:00:00"),
+                    ],
+                )
+
+            records = get_key_history(database_path, first_key_id)
+
+            self.assertEqual([first_key_id], [record.key_id for record in records])
+
+    def test_get_key_history_rejects_non_positive_key_id(self):
+        with self.assertRaises(ValueError):
+            get_key_history(":memory:", 0)
 
     def test_change_key_holder_preserves_key_owner(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -696,6 +778,145 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual("telegram_name", member.telegram_name)
             self.assertEqual("12345", member.phone_number)
 
+    def test_get_gym_member_records_filters_and_returns_member_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                expected_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    123456,
+                    "Lovelace",
+                    1234,
+                    name="Ada",
+                    telegram_name="@ada",
+                    phone_number="+49123456789",
+                )
+                create_gym_member_with_telegram_user_id(
+                    connection,
+                    654321,
+                    "Byron",
+                    4321,
+                    name="Ada",
+                )
+
+            members = get_gym_member_records(
+                database_path,
+                name="ada",
+                surname="lovelace",
+                room_number=1234,
+            )
+
+            self.assertEqual(1, len(members))
+            member = members[0]
+            self.assertEqual(expected_id, member.id)
+            self.assertEqual(123456, member.telegram_user_id)
+            self.assertEqual("Ada", member.name)
+            self.assertEqual("Lovelace", member.surname)
+            self.assertEqual(1234, member.room_number)
+            self.assertEqual("@ada", member.telegram_name)
+            self.assertEqual("+49123456789", member.phone_number)
+            self.assertFalse(member.is_admin)
+
+    def test_add_gym_member_creates_member_with_optional_contact_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            member = add_gym_member(
+                database_path,
+                telegram_user_id=123456,
+                name="Database",
+                surname="Member",
+                room_number=1234,
+                telegram_name="@database_member",
+                phone_number="+49123456789",
+            )
+
+            self.assertEqual(123456, member.telegram_user_id)
+            self.assertEqual("Database Member", member.full_name)
+            self.assertEqual(1234, member.room_number)
+            self.assertEqual("@database_member", member.telegram_name)
+            self.assertEqual("+49123456789", member.phone_number)
+            self.assertFalse(member.is_admin)
+
+    def test_add_gym_member_allows_missing_optional_contact_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            member = add_gym_member(
+                database_path,
+                telegram_user_id=123456,
+                name="Database",
+                surname="Member",
+                room_number=1234,
+            )
+
+            self.assertIsNone(member.telegram_name)
+            self.assertIsNone(member.phone_number)
+
+    def test_add_gym_member_rejects_duplicate_telegram_user_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            add_gym_member(
+                database_path,
+                telegram_user_id=123456,
+                name="First",
+                surname="Member",
+                room_number=1234,
+            )
+
+            with self.assertRaisesRegex(
+                GymMemberAlreadyExistsError,
+                "gym member already exists for Telegram ID: 123456",
+            ):
+                add_gym_member(
+                    database_path,
+                    telegram_user_id=123456,
+                    name="Second",
+                    surname="Member",
+                    room_number=5678,
+                )
+
+    def test_update_gym_member_updates_only_supplied_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            add_gym_member(
+                database_path,
+                telegram_user_id=123456,
+                name="Old",
+                surname="Surname",
+                room_number=1234,
+                telegram_name="@old",
+                phone_number="+49111",
+            )
+
+            member = update_gym_member(
+                database_path,
+                123456,
+                name="New",
+                room_number=4321,
+            )
+
+            self.assertEqual("New", member.name)
+            self.assertEqual("Surname", member.surname)
+            self.assertEqual(4321, member.room_number)
+            self.assertEqual("@old", member.telegram_name)
+            self.assertEqual("+49111", member.phone_number)
+
+    def test_update_gym_member_returns_none_when_member_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            member = update_gym_member(database_path, 123456, name="New")
+
+            self.assertIsNone(member)
+
     def test_get_key_id_by_telegram_user_id_returns_currently_held_key_id(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
@@ -751,6 +972,79 @@ class DatabaseTests(unittest.TestCase):
             instruction = get_key_return_instruction_info(database_path, 123456)
 
             self.assertEqual((key_id, 1234), instruction)
+
+    def test_get_key_status_returns_holder_owner_and_active_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                owner_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    100,
+                    "Mailbox",
+                    1234,
+                    name="Key",
+                )
+                holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    200,
+                    "Holder",
+                    5678,
+                    name="Current",
+                )
+                key_id = create_key(connection, holder_id, owner_id)
+                connection.execute(
+                    "UPDATE keys SET is_active = 0 WHERE id = ?",
+                    (key_id,),
+                )
+
+            self.assertEqual(
+                KeyStatus(
+                    key_id=key_id,
+                    current_holder=GymMember(
+                        holder_id, 200, "Current", "Holder", 5678, None, None, False
+                    ),
+                    owner=GymMember(
+                        owner_id, 100, "Key", "Mailbox", 1234, None, None, False
+                    ),
+                    is_active=False,
+                ),
+                get_key_status(database_path, key_id),
+            )
+
+    def test_get_key_status_returns_none_for_missing_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            self.assertIsNone(get_key_status(database_path, 999))
+
+    def test_set_key_active_updates_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with sqlite3.connect(database_path) as connection:
+                holder_id = create_gym_member_with_telegram_user_id(
+                    connection,
+                    123456,
+                    "Holder",
+                    1234,
+                )
+                key_id = create_key(connection, holder_id)
+
+            self.assertTrue(set_key_active(database_path, key_id, False))
+            self.assertFalse(get_key_status(database_path, key_id).is_active)
+            self.assertTrue(set_key_active(database_path, key_id, True))
+            self.assertTrue(get_key_status(database_path, key_id).is_active)
+
+    def test_set_key_active_returns_false_for_missing_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            self.assertFalse(set_key_active(database_path, 999, True))
 
 
 if __name__ == "__main__":

@@ -64,6 +64,31 @@ class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
             handover_flow.PENDING_HANDOVERS[1].holder.full_name,
         )
 
+    async def test_cancel_pending_handover_removes_it_and_cancels_timeout(self):
+        timeout_task = asyncio.create_task(asyncio.sleep(60))
+        handover_flow.PENDING_HANDOVERS[1] = handover_flow.PendingHandover(
+            holder=GymMember(
+                id=1,
+                telegram_user_id=123,
+                name="Database",
+                surname="Holder",
+                room_number=101,
+                telegram_name=None,
+                phone_number=None,
+                is_admin=False,
+            ),
+            message=SimpleNamespace(),
+            state_change_function=AsyncMock(),
+            timeout_task=timeout_task,
+        )
+
+        cancelled = handover_flow.cancel_pending_handover(1)
+
+        self.assertTrue(cancelled)
+        self.assertNotIn(1, handover_flow.PENDING_HANDOVERS)
+        await asyncio.sleep(0)
+        self.assertTrue(timeout_task.cancelled())
+
     async def test_complete_handover_sends_one_button_message_in_same_chat(self):
         state_change_function = AsyncMock()
         pending_message = SimpleNamespace(chat_id=10)

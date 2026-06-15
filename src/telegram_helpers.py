@@ -1,7 +1,7 @@
 from telegram import CallbackQuery, Message, Update
 
 
-def get_update_user_id(update: Update) -> int | None:
+def get_update_telegram_user_id(update: Update) -> int | None:
     user = getattr(update, "effective_user", None)
     if user is None:
         return None

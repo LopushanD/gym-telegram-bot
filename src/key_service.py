@@ -9,6 +9,7 @@ from src.database import (
     get_all_current_keyholders_info,
     get_key_count,
     get_key_return_instruction_info,
+    get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
     get_key_owner_mailbox_info
 )
@@ -35,6 +36,12 @@ class TakeFromMailboxStatus(Enum):
     USER_NOT_REGISTERED = "user_not_registered"
 
 
+class GiveKeyStatus(Enum):
+    GIVEN = "given"
+    KEY_NOT_FOUND = "key_not_found"
+    USER_NOT_REGISTERED = "user_not_registered"
+
+
 @dataclass(frozen=True)
 class HandoverResult:
     status: HandoverStatus
@@ -48,6 +55,12 @@ class ReturnToMailboxResult:
 @dataclass(frozen=True)
 class TakeFromMailboxResult:
     status: TakeFromMailboxStatus
+
+
+@dataclass(frozen=True)
+class GiveKeyResult:
+    status: GiveKeyStatus
+    member: GymMember | None = None
 
 
 def get_keyholders(database_path)-> list[KeyHolder]:
@@ -107,3 +120,15 @@ def take_key_from_mailbox(database_path,telegram_user_id,key_id,mailbox_member_i
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.USER_NOT_REGISTERED)
     change_key_holder(database_path, key_id, member_id)
     return TakeFromMailboxResult(status=TakeFromMailboxStatus.TAKEN)
+
+
+def give_key_to_member(database_path, key_id, telegram_user_id):
+    member = get_gym_member_by_telegram_user_id(database_path, telegram_user_id)
+    if member is None:
+        return GiveKeyResult(status=GiveKeyStatus.USER_NOT_REGISTERED)
+
+    if get_current_keyholder_info(database_path, key_id) is None:
+        return GiveKeyResult(status=GiveKeyStatus.KEY_NOT_FOUND)
+
+    change_key_holder(database_path, key_id, member.id)
+    return GiveKeyResult(status=GiveKeyStatus.GIVEN, member=member)

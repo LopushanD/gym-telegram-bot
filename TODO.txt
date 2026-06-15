@@ -1,26 +1,33 @@
 ---------- FIRST PRIORITY ----------
-- Add admin convenient usage of admin features
-        * /givekey key_id telegram_id
-        * /returnkey key_id mailbox_room
-        * /keyhistory key_id [last n records]
-        * /activatekey key_id
-        * /deactivatekey key_id
-        * /keystatus key_id # full information about key status
-        * /keys # general information about keys
-        * /adduser telegram_id name surname room [telegram_name] [phone number]
-        * /deleteuser telegram_id
-        * /updateuser telegram_id [name] [surname] [room] [telegram_name] [phone number]
-        * /users [name] [surname] [room] # information about all users for give
-        * /help
         
 - Update starting message, it should contain:
         - information about where to report bugs.
         - Contact information for information/suggestions/etc. 
 -find where the bot could life (given that it might need to be updated/restarted)
 ---------- SECOND PRIORITY ----------
+- refactor commands code. Now it's redundant.
 - write technical documentation
+- think of more convenient way to access people, now it's by telegram_id which is inconvenient (use ID)
 - Test on someone if everything is intuitive
 - get holders for papers for keychains (to write what key has which id)
-- Reengineer the way handlers are stored
 ---------- THIRD PRIORITY ----------
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
+- Add another Bot which will serve as a testing/learning ground for admins.
+- Reengineer the way handlers are stored
+
+---------- Temporary information ----------
+- Add admin convenient usage of admin features
+        * /givekey key_id telegram_id (X)
+        * /mytelegramid # shows user telegram id (X)
+        * /clear (X)
+        * /users [name] [surname] [room] # information about all users for given query (X)
+        * /adduser telegram_id name surname room [telegram_name] [phone_number] (X)
+        * /keyhistory key_id [last n records] (X)
+        * /updateuser telegram_id option value [option value ...] (X)
+        * /keystatus key_id # full information about key status (current holder, owner, isActivated) (X)
+        * /activatekey key_id (X)
+        * /deactivatekey key_id (X)
+
+        * /keys # general information about keys
+        * /deleteuser telegram_id
+        * /help

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass(frozen=True)
@@ -21,3 +22,19 @@ class GymMember:
 class KeyHolder:
     key_id: int
     member: GymMember
+
+
+@dataclass(frozen=True)
+class KeyStatus:
+    key_id: int
+    current_holder: GymMember
+    owner: GymMember
+    is_active: bool
+
+
+@dataclass(frozen=True)
+class KeyHistoryRecord:
+    event_id: int
+    key_id: int
+    member: GymMember
+    taken_at: datetime

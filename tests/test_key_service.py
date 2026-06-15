@@ -8,8 +8,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.models import GymMember, KeyHolder
 from src.key_service import (
+    GiveKeyStatus,
     HandoverStatus,
     KeyReturnInstruction,
+    give_key_to_member,
     get_keyholders,
     get_tracked_key_count,
     get_key_return_instruction,
@@ -19,6 +21,18 @@ from src.key_service import (
 
 
 class KeyServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.member = GymMember(
+            id=10,
+            telegram_user_id=123,
+            name="Dima",
+            surname="Ivanov",
+            room_number=1234,
+            telegram_name="@dima",
+            phone_number="+49123456789",
+            is_admin=False,
+        )
+
     def test_get_keyholders_returns_domain_objects(self):
         with patch(
             "src.key_service.get_all_current_keyholders_info",
@@ -128,6 +142,50 @@ class KeyServiceTests(unittest.TestCase):
             result = can_start_key_handover("database.sqlite3", 123, key_id=1)
 
         self.assertEqual(HandoverStatus.NOT_CURRENT_HOLDER, result.status)
+
+    def test_give_key_to_member_changes_holder(self):
+        with (
+            patch(
+                "src.key_service.get_gym_member_by_telegram_user_id",
+                return_value=self.member,
+            ),
+            patch("src.key_service.get_current_keyholder_info", return_value=object()),
+            patch("src.key_service.change_key_holder") as change_key_holder,
+        ):
+            result = give_key_to_member("database.sqlite3", 1, 123)
+
+        self.assertEqual(GiveKeyStatus.GIVEN, result.status)
+        self.assertEqual(self.member, result.member)
+        change_key_holder.assert_called_once_with("database.sqlite3", 1, self.member.id)
+
+    def test_give_key_to_member_rejects_unregistered_member(self):
+        with (
+            patch(
+                "src.key_service.get_gym_member_by_telegram_user_id",
+                return_value=None,
+            ),
+            patch("src.key_service.get_current_keyholder_info") as get_holder,
+            patch("src.key_service.change_key_holder") as change_key_holder,
+        ):
+            result = give_key_to_member("database.sqlite3", 1, 123)
+
+        self.assertEqual(GiveKeyStatus.USER_NOT_REGISTERED, result.status)
+        get_holder.assert_not_called()
+        change_key_holder.assert_not_called()
+
+    def test_give_key_to_member_rejects_missing_key(self):
+        with (
+            patch(
+                "src.key_service.get_gym_member_by_telegram_user_id",
+                return_value=self.member,
+            ),
+            patch("src.key_service.get_current_keyholder_info", return_value=None),
+            patch("src.key_service.change_key_holder") as change_key_holder,
+        ):
+            result = give_key_to_member("database.sqlite3", 999, 123)
+
+        self.assertEqual(GiveKeyStatus.KEY_NOT_FOUND, result.status)
+        change_key_holder.assert_not_called()
 
 
 if __name__ == "__main__":

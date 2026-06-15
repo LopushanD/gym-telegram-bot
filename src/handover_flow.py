@@ -66,6 +66,15 @@ def get_pending_handover(key_id) -> PendingHandover | None:
         return None
     return pending_handover
 
+
+def cancel_pending_handover(key_id: int) -> bool:
+    pending_handover = PENDING_HANDOVERS.pop(key_id, None)
+    if pending_handover is None:
+        return False
+    pending_handover.timeout_task.cancel()
+    return True
+
+
 async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> None:
     telegram_user_id = get_callback_telegram_user_id(query)
     if not user_currently_holds_key(DEFAULT_DATABASE_PATH, telegram_user_id, key_id):
@@ -162,9 +171,6 @@ async def handle_pending_handover_cancellation(
     query: CallbackQuery,
     message: Message,
 ) -> None:
-    pending_handover = get_pending_handover(key_id)
-    if pending_handover is not None:
-        PENDING_HANDOVERS.pop(key_id, None)
-        pending_handover.timeout_task.cancel()
+    cancel_pending_handover(key_id)
     await edit_to_start_state(message,messages.HOLDER_CHANGE_CANCELLED_TEXT,get_callback_telegram_user_id(query))
         

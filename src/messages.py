@@ -1,6 +1,7 @@
 from src.config import HANDOVER_WINDOW_SECONDS
-from src.models import KeyHolder
+from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
 
+UNKNOWN_EXCEPTION = "Unknown error occured."
 # Message constants use WHAT_POV_ACTION_KIND.
 START_USER_MENU_TEXT = "Choose what you want to do."
 KEY_RECEIVER_CONFIRM_NOTICE = "Confirm before recording."
@@ -16,8 +17,9 @@ HANDOVER_HOLDER_PENDING_TEXT = "Key {key_id} already has a pending handover. Wai
 HANDOVER_RECEIVER_MISSING_TEXT = "No pending handover was found for key {key_id}. Ask the current holder to start the handover."
 
 HANDOVER_RECEIVER_SELF_TEXT = "You cannot confirm a handover from yourself."
-AUTH_USER_MISSING_TEXT = "Could not identify your Telegram user."
+AUTH_USER_MISSING_TEXT = "Could not identify your Telegram id."
 AUTH_USER_UNREGISTERED_TEXT = "You are not registered as a gym member."
+MY_TELEGRAM_ID_TEXT = "Your Telegram ID is {telegram_user_id}."
 KEY_RECEIVER_RECORDED_TEXT = "Recorded: you received the key."
 
 MAILBOX_HOLDER_BLOCKED_TEXT = "You cannot hand over key {key_id} because you are not its recorded holder."
@@ -36,6 +38,68 @@ MAILBOX_RECEIVER_TAKEN_TEXT = "Recorded: You are now the holder of key {key_id}.
 MAILBOX_RECEIVER_EMPTY_TEXT = "Key {key_id} is currently recorded as being held not by mailbox, but by someone else. Check 'Key holder info'."
 
 CALLBACK_USER_UNKNOWN_TEXT = "Unknown button. Back to the start."
+ADMIN_BAD_VALUE_TEXT = "Entered value is not valid"
+ADMIN_COMMAND_FORBIDDEN_TEXT = "Only admins can use this command."
+ADMIN_GIVE_KEY_USAGE_TEXT = "Usage: /givekey key_id telegram_id"
+ADMIN_GIVE_KEY_USER_NOT_REGISTERED_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
+KEY_NOT_FOUND_TEXT = "Key {key_id} does not exist."
+ADMIN_GIVE_KEY_COMPLETED_TEXT = "Recorded: key {key_id} was given to {member} (Telegram ID {telegram_user_id})."
+ADMIN_ADD_USER_USAGE_TEXT = "Usage: /adduser telegram_id name surname room [telegram_name] [phone_number]"
+ADMIN_ADD_USER_ALREADY_EXISTS_TEXT = "A gym member with Telegram ID {telegram_user_id} already exists."
+ADMIN_ADD_USER_COMPLETED_TEXT = "Added gym member {member} (Telegram ID {telegram_user_id}), room {room_number}."
+ADMIN_UPDATE_USER_USAGE_TEXT = (
+    "Usage: /updateuser telegram_id option value [option value ...]\n"
+    "Options: -n/--name, -s/--surname, -r/--room, "
+    "-t/--telegram-name, -p/--phone-number"
+)
+ADMIN_UPDATE_USER_NOT_FOUND_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
+ADMIN_UPDATE_USER_NO_CHANGES_TEXT = "No user data changed for Telegram ID {telegram_user_id}."
+ADMIN_UPDATE_USER_COMPLETED_TEXT = "Updated gym member with Telegram ID {telegram_user_id}:\n{changes}"
+ADMIN_USERS_USAGE_TEXT = "Usage: /users [name] [surname] [room]"
+ADMIN_USERS_NOT_FOUND_TEXT = "No gym members matched the query."
+ADMIN_KEY_HISTORY_USAGE_TEXT = "Usage: /keyhistory key_id [last_n_records]"
+ADMIN_KEY_HISTORY_NOT_FOUND_TEXT = "key holder history was not found."
+ADMIN_KEY_STATUS_USAGE_TEXT = "Usage: /keystatus key_id"
+ADMIN_ACTIVATE_KEY_USAGE_TEXT = "Usage: /activatekey key_id"
+ADMIN_DEACTIVATE_KEY_USAGE_TEXT = "Usage: /deactivatekey key_id"
+ADMIN_ACTIVATE_KEY_COMPLETED_TEXT = "Activated key {key_id}."
+ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT = "Deactivated key {key_id}."
+HELP_TEXT = """Available commands:
+
+/mytelegramid
+Show your Telegram user ID.
+
+/clear
+Delete all messages from the chat. In some cases Telegram does not allow to delete messages. \
+In this case use 'clear history' in your chat settings.
+
+Admin commands:
+
+/adduser telegram_id name surname room [telegram_name] [phone_number]
+Register a new gym member. Telegram name and phone number are optional.
+
+/updateuser telegram_id option value [option value ...]
+Options: -n/--name, -s/--surname, -r/--room, -t/--telegram-name, -p/--phone-number
+Update specific gym member fields. Options can be supplied in any order.
+Example: /updateuser 123456 -r 204 --phone-number +49123456789
+
+/givekey key_id telegram_id
+Record that the registered gym member with the given Telegram ID received the key.
+
+/users [name] [surname] [room]
+List full information about gym members matching the optional filters.
+
+/keyhistory key_id [last_n_records]
+List the most recent holder changes for a key. Defaults to 5 records.
+
+/keystatus key_id
+Show the key's current holder, owner, and active status.
+
+/activatekey key_id
+Activate a key.
+
+/deactivatekey key_id
+Deactivate a key."""
 
 
 def mailbox_receiver_take_prompt(key_id: int) -> str:
@@ -56,3 +120,36 @@ def current_key_holder_text(holder: KeyHolder) -> str:
     if member.phone_number:
         text += f"\nPhone: {member.phone_number}"
     return text
+
+
+def gym_member_record_text(member: GymMember) -> str:
+    return " ".join(
+        (
+            f"ID: {member.id}",
+            f"Telegram ID: {member.telegram_user_id}",
+            f"Name: {member.name}",
+            f"Surname: {member.surname}",
+            f"Room: {member.room_number}",
+            f"Telegram name: {member.telegram_name or '-'}",
+            f"Phone number: {member.phone_number or '-'}",
+            f"Admin: {'yes' if member.is_admin else 'no'}",
+        )
+    )
+
+
+def key_history_record_text(record: KeyHistoryRecord) -> str:
+    return (
+        f"{record.taken_at:%Y-%m-%d %H:%M:%S} UTC: "
+        f"key {record.key_id} received by {record.member.full_name}, "
+        f"room {record.member.room_number}."
+    )
+
+
+def key_status_text(status: KeyStatus) -> str:
+    return "\n".join(
+        (
+            f"Key ID: {status.key_id}\nActive: {'yes' if status.is_active else 'no'}",
+            f"Current holder:\n{gym_member_record_text(status.current_holder)}",
+            f"Owner:\n{gym_member_record_text(status.owner)}",
+        )
+    )

@@ -5,6 +5,17 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 
 from src import messages
+from src.admin_commands import (
+    activate_key_command_handler,
+    add_user_command_handler,
+    deactivate_key_command_handler,
+    give_key_command_handler,
+    help_command_handler,
+    key_history_command_handler,
+    key_status_command_handler,
+    update_user_command_handler,
+    users_command_handler,
+)
 from src.bot_replies import (
     edit_to_start_state,
     reply_with_start_state,
@@ -53,7 +64,8 @@ from src.key_service import (
     TakeFromMailboxStatus,
     take_key_from_mailbox,
 )
-from src.telegram_helpers import get_callback_telegram_user_id, get_update_user_id
+from src.telegram_helpers import get_callback_telegram_user_id, get_update_telegram_user_id
+from src.user_commands import clear_command_handler, my_telegram_id_command_handler
 
 CallbackHandler = Callable[[CallbackQuery, Message], Awaitable[None]]
 
@@ -62,7 +74,7 @@ async def start_state_command_handler(update: Update, context) -> None:
     await reply_with_start_state(
         update.effective_message,
         messages.START_USER_MENU_TEXT,
-        telegram_user_id=get_update_user_id(update),
+        telegram_user_id=get_update_telegram_user_id(update),
     )
 
 
@@ -286,6 +298,17 @@ def main() -> None:
     )
 
     application.add_handler(CommandHandler("start", start_state_command_handler))
+    application.add_handler(CommandHandler("mytelegramid", my_telegram_id_command_handler))
+    application.add_handler(CommandHandler("clear", clear_command_handler))
+    application.add_handler(CommandHandler("givekey", give_key_command_handler))
+    application.add_handler(CommandHandler("adduser", add_user_command_handler))
+    application.add_handler(CommandHandler("updateuser", update_user_command_handler))
+    application.add_handler(CommandHandler("users", users_command_handler))
+    application.add_handler(CommandHandler("keyhistory", key_history_command_handler))
+    application.add_handler(CommandHandler("keystatus", key_status_command_handler))
+    application.add_handler(CommandHandler("activatekey", activate_key_command_handler))
+    application.add_handler(CommandHandler("deactivatekey", deactivate_key_command_handler))
+    application.add_handler(CommandHandler("help", help_command_handler))
     application.add_handler(CallbackQueryHandler(callback_query_handler))
     print("Telegram Bot started!", flush=True)
     application.run_polling()
