@@ -1,9 +1,16 @@
 from src.config import HANDOVER_WINDOW_SECONDS
 from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
+from src.user_commands import TUTORIALS_INFO_TUTORIAL
 
 UNKNOWN_EXCEPTION = "Unknown error occured."
 # Message constants use WHAT_POV_ACTION_KIND.
-START_USER_MENU_TEXT = "Choose what you want to do."
+START_USER_MENU_TEXT = (
+    "Welcome to the gym key tracking bot.\n\n"
+    f"to get usage instructions, use /{TUTORIALS_INFO_TUTORIAL}. Read those, if you do not know, what to do. For available commands, use /help. "
+    "Admins can use /commands to see all available commands for admins. \n\n"
+    "Found a bug or have a suggestion? Contact ***REMOVED***."
+)
+USER_TUTORIAL_EMPTY_TEXT = "The tutorial is not available yet."
 KEY_RECEIVER_CONFIRM_NOTICE = "Confirm before recording."
 KEY_RECEIVER_RECORD_PROMPT = "Confirm that you received key {key_id} from {from_member}."
 
@@ -64,43 +71,6 @@ ADMIN_ACTIVATE_KEY_USAGE_TEXT = "Usage: /activatekey key_id"
 ADMIN_DEACTIVATE_KEY_USAGE_TEXT = "Usage: /deactivatekey key_id"
 ADMIN_ACTIVATE_KEY_COMPLETED_TEXT = "Activated key {key_id}."
 ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT = "Deactivated key {key_id}."
-HELP_TEXT = """Available commands:
-
-/mytelegramid
-Show your Telegram user ID.
-
-/clear
-Delete all messages from the chat. In some cases Telegram does not allow to delete messages. \
-In this case use 'clear history' in your chat settings.
-
-Admin commands:
-
-/adduser telegram_id name surname room [telegram_name] [phone_number]
-Register a new gym member. Telegram name and phone number are optional.
-
-/updateuser telegram_id option value [option value ...]
-Options: -n/--name, -s/--surname, -r/--room, -t/--telegram-name, -p/--phone-number
-Update specific gym member fields. Options can be supplied in any order.
-Example: /updateuser 123456 -r 204 --phone-number +49123456789
-
-/givekey key_id telegram_id
-Record that the registered gym member with the given Telegram ID received the key.
-
-/users [name] [surname] [room]
-List full information about gym members matching the optional filters.
-
-/keyhistory key_id [last_n_records]
-List the most recent holder changes for a key. Defaults to 5 records.
-
-/keystatus key_id
-Show the key's current holder, owner, and active status.
-
-/activatekey key_id
-Activate a key.
-
-/deactivatekey key_id
-Deactivate a key."""
-
 
 def mailbox_receiver_take_prompt(key_id: int) -> str:
     return f"Confirm that you received key {key_id} from the mailbox."

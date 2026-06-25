@@ -1,58 +1,49 @@
-from telegram import Chat, Update
-from telegram.error import TelegramError
+from pathlib import Path
+TUTORIALS_INFO_TUTORIAL = "tutorials"
+REGESTRATION_TUTORIAL = "regestrationtutorial"
+GET_KEY_TUTORIAL = "getkeytutorial"
+GIVE_KEY_TUTORIAL = "givekeytutorial"
+RETURN_KEY_TUTORIAL = "returnkeytutorial"
 
-from src import messages
-from src.bot_replies import build_start_state_markup
-from src.telegram_helpers import get_update_telegram_user_id
+HELP_USER_COMMAND = "help"
+CLEAR_USER_COMMAND = "clear"
+GET_TG_ID_USER_COMMAND = "mytelegramid"
+START_USER_COMMAND = "start"
+SHOW_ADMINS_USER_COMMAND = "admins"
+HELP_TEXT = f"""Available commands:
 
-CLEAR_BATCH_SIZE = 100
+/mytelegramid
+Shows your Telegram user ID\.
 
+/clear
+Delete all messages from the chat\. In some cases Telegram does not allow to delete messages\. In this case use _'clear history'_ in your chat settings\.
 
-async def delete_deletable_messages(bot, chat_id: int, message_ids: list[int]) -> bool:
-    """Delete what Telegram permits and report whether any deletion request succeeded."""
+/{TUTORIALS_INFO_TUTORIAL}
+Shows all available tutorials\.
+
+/start
+Get starting message and buttons\.
+
+/admins
+Shows list of all bot admins\.
+"""
+
+TURORIALS_ROOT = Path(__file__).resolve().parents[1] / "assets" / "user_tutorials"
+TUTORIAL_PATHS = {
+    TUTORIALS_INFO_TUTORIAL: TURORIALS_ROOT / "tutorial_about_tutorials.md",
+    REGESTRATION_TUTORIAL: TURORIALS_ROOT / "registration.md",
+    GET_KEY_TUTORIAL: TURORIALS_ROOT / "get_key.md",
+    GIVE_KEY_TUTORIAL: TURORIALS_ROOT / "give_key.md",
+    RETURN_KEY_TUTORIAL: TURORIALS_ROOT / "return_key.md",
+}
+
+def load_user_tutorial(tutorial_name: str) -> str:
     try:
-        await bot.delete_messages(chat_id=chat_id, message_ids=message_ids)
-        return True
-    except TelegramError:
-        if len(message_ids) == 1:
-            return False
+        tutorial_path = TUTORIAL_PATHS[tutorial_name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown user tutorial: {tutorial_name}") from exc
 
-    middle = len(message_ids) // 2
-    newer_deleted = await delete_deletable_messages(bot, chat_id, message_ids[middle:])
-    if not newer_deleted:
-        return False
-
-    older_deleted = await delete_deletable_messages(bot, chat_id, message_ids[:middle])
-    return newer_deleted or older_deleted
-
-
-async def my_telegram_id_command_handler(update: Update, context) -> None:
-    telegram_user_id = get_update_telegram_user_id(update)
-    if telegram_user_id is None:
-        await update.effective_message.reply_text(messages.AUTH_USER_MISSING_TEXT)
-    else:
-        await update.effective_message.reply_text(
-            messages.MY_TELEGRAM_ID_TEXT.format(telegram_user_id=telegram_user_id))
-
-
-async def clear_command_handler(update: Update, context) -> None:
-    message = update.effective_message
-    chat = update.effective_chat
-    last_message_id = message.message_id
-    while last_message_id > 0:
-        # telegram deletes messages in batches with certain max size
-        first_message_id = max(1, last_message_id - CLEAR_BATCH_SIZE + 1)
-        deleted_any = await delete_deletable_messages(
-            context.bot,
-            chat.id,
-            list(range(first_message_id, last_message_id + 1)),
-        )
-        if not deleted_any:
-            break
-        last_message_id = first_message_id - 1
-
-    # await context.bot.send_message(
-    #     chat_id=chat.id,
-    #     text=messages.START_USER_MENU_TEXT,
-    #     reply_markup=build_start_state_markup(get_update_telegram_user_id(update)),
-    # )
+    try:
+        return tutorial_path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Tutorial asset not found: {tutorial_path}") from exc

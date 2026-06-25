@@ -1,14 +1,13 @@
 ---------- FIRST PRIORITY ----------
-        
-- Update starting message, it should contain:
-        - information about where to report bugs.
-        - Contact information for information/suggestions/etc. 
+- add user command that helps to see all admins of the bot.
 -find where the bot could life (given that it might need to be updated/restarted)
+- Test on someone if everything is intuitive
 ---------- SECOND PRIORITY ----------
+- look at admin commands that need an update to make them more convenient. Do not forget to update documentation afterwards.
+        * /users
+- think of more convenient way to access people, now it's by telegram_id which is inconvenient (use ID)
 - refactor commands code. Now it's redundant.
 - write technical documentation
-- think of more convenient way to access people, now it's by telegram_id which is inconvenient (use ID)
-- Test on someone if everything is intuitive
 - get holders for papers for keychains (to write what key has which id)
 ---------- THIRD PRIORITY ----------
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
