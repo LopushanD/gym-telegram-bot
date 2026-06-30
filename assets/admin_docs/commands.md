@@ -5,7 +5,9 @@ Required inputs are written without brackets\.
 Optional inputs are written inside square brackets\.
 
 Each command has `-h` or `--help` option, which will show detailed description and usage of the corresponding command\.
+
 If you enter a command that requires at least one input with no inputs, you will get a message with a short usage hint\.
+\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=
 
 `/adduser telegram_id name surname room [telegram_name] [phone_number]`
 Register a new gym member\. Telegram name and phone number are optional\.

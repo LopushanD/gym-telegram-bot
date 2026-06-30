@@ -1,10 +1,12 @@
 ---------- FIRST PRIORITY ----------
-- add user command that helps to see all admins of the bot.
 -find where the bot could life (given that it might need to be updated/restarted)
 - Test on someone if everything is intuitive
 ---------- SECOND PRIORITY ----------
+- adjust /clear command. It needs to also show start message (basically /clear + /start)
 - look at admin commands that need an update to make them more convenient. Do not forget to update documentation afterwards.
         * /users
+- see if adding /clear command to tutorials will make user experience better.
+- remove redundant functions from database.py. Leave only the most general ones.
 - think of more convenient way to access people, now it's by telegram_id which is inconvenient (use ID)
 - refactor commands code. Now it's redundant.
 - write technical documentation

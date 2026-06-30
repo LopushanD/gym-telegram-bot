@@ -6,11 +6,12 @@ UNKNOWN_EXCEPTION = "Unknown error occured."
 # Message constants use WHAT_POV_ACTION_KIND.
 START_USER_MENU_TEXT = (
     "Welcome to the gym key tracking bot.\n\n"
-    f"to get usage instructions, use /{TUTORIALS_INFO_TUTORIAL}. Read those, if you do not know, what to do. For available commands, use /help. "
-    "Admins can use /commands to see all available commands for admins. \n\n"
+    f"to get usage instructions, use /{TUTORIALS_INFO_TUTORIAL}. Read those, if you do not know, what to do. For available commands, use /help."
+    "\n\nAdmins can use /commands to see all available commands for admins. \n\n"
     "Found a bug or have a suggestion? Contact ***REMOVED***."
 )
 USER_TUTORIAL_EMPTY_TEXT = "The tutorial is not available yet."
+USER_COMMAND_ADMINS_NOT_FOUND_TEXT = "There are currently no active gym AG members."
 KEY_RECEIVER_CONFIRM_NOTICE = "Confirm before recording."
 KEY_RECEIVER_RECORD_PROMPT = "Confirm that you received key {key_id} from {from_member}."
 
@@ -91,7 +92,8 @@ def current_key_holder_text(holder: KeyHolder) -> str:
         text += f"\nPhone: {member.phone_number}"
     return text
 
-
+# TODO I think it's better to get rid of this function and make local
+# functions that format records as needed  
 def gym_member_record_text(member: GymMember) -> str:
     return " ".join(
         (

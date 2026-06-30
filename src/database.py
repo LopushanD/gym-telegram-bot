@@ -452,8 +452,8 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
 
     return _gym_member_from_row(member)
 
-
-def get_gym_member_records(database_path,name=None,surname=None,room_number=None) -> list[GymMember]:
+# TODO make possibility to query any field here. Make it primary member retrieval function
+def get_gym_member_records(database_path,name=None,surname=None,room_number=None,is_admin=None) -> list[GymMember]:
     """Return gym members matching the supplied filters."""
     query = """
         SELECT
@@ -479,7 +479,9 @@ def get_gym_member_records(database_path,name=None,surname=None,room_number=None
     if room_number is not None:
         conditions.append("room_number = ?")
         parameters.append(room_number)
-
+    if is_admin is not None:
+        conditions.append("is_admin = ?")
+        parameters.append(is_admin)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY surname COLLATE NOCASE, name COLLATE NOCASE, id"

@@ -1,7 +1,7 @@
 from telegram import Update
 from src.admin_commands import *
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH,LAST_N_RECORDS_DEFAULT
+from src.config import DEFAULT_DATABASE_PATH,LAST_N_RECORDS_DEFAULT,TELEGRAM_MESSAGE_LIMIT
 from src.database import (
     GymMemberAlreadyExistsError,
     add_gym_member,
@@ -17,7 +17,6 @@ from src.key_service import GiveKeyStatus, give_key_to_member
 from src.models import GymMember
 from src.telegram_helpers import get_update_telegram_user_id
 
-TELEGRAM_MESSAGE_LIMIT = 4096
 HELP_OPTIONS = {"-h", "--help"}
 UPDATE_USER_OPTION_FIELDS = {
     "-n": "name",
@@ -333,7 +332,8 @@ async def users_command_handler(update: Update, context) -> None:
     if not members:
         await message.reply_text(messages.ADMIN_USERS_NOT_FOUND_TEXT)
         return
-
+    #TODO rewrite this code. Now it makes transformation that makes no sense.
+    #Check show_admins_command_handler function. It's more clean
     member_texts = [messages.gym_member_record_text(member) for member in members]
     for reply in _split_record_texts(member_texts, "\n\n"):
         await message.reply_text(reply)

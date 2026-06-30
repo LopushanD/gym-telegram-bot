@@ -2,12 +2,26 @@ from telegram import Update
 from telegram.error import TelegramError
 
 from src import messages
+from src.config import DEFAULT_DATABASE_PATH,TELEGRAM_MESSAGE_LIMIT
 from src.telegram_helpers import get_update_telegram_user_id
+from src.database import get_gym_member_records,GymMember
 from src.user_commands import *
 
 CLEAR_BATCH_SIZE = 100
 
-async def delete_deletable_messages(bot, chat_id: int, message_ids: list[int]) -> bool:
+def _process_admin_records(members: list[GymMember], separator: str) -> list[str]:
+    replies = []
+    for member in members:
+        record = " ".join(["Name:",member.full_name,"Room:",str(member.room_number),
+        "Telegram username:",member.telegram_name if member.telegram_name is not None else "-"]) 
+        #checks if message length is enough or another message is needed to fit everything
+        if replies and len(replies[-1]) + len(separator) + len(record) <= TELEGRAM_MESSAGE_LIMIT:
+            replies[-1] += separator + record
+        else:
+            replies.append(record)
+    return replies
+
+async def _delete_deletable_messages(bot, chat_id: int, message_ids: list[int]) -> bool:
     """Delete what Telegram permits and report whether any deletion request succeeded."""
     try:
         await bot.delete_messages(chat_id=chat_id, message_ids=message_ids)
@@ -17,11 +31,11 @@ async def delete_deletable_messages(bot, chat_id: int, message_ids: list[int]) -
             return False
 
     middle = len(message_ids) // 2
-    newer_deleted = await delete_deletable_messages(bot, chat_id, message_ids[middle:])
+    newer_deleted = await _delete_deletable_messages(bot, chat_id, message_ids[middle:])
     if not newer_deleted:
         return False
 
-    older_deleted = await delete_deletable_messages(bot, chat_id, message_ids[:middle])
+    older_deleted = await _delete_deletable_messages(bot, chat_id, message_ids[:middle])
     return newer_deleted or older_deleted
 
 async def help_command_handler(update: Update, context) -> None:
@@ -55,6 +69,15 @@ async def return_key_tutorial_command_handler(update: Update, context) -> None:
     message = update.effective_message
     await message.reply_text(load_user_tutorial(RETURN_KEY_TUTORIAL),parse_mode="MarkdownV2")
 
+async def show_admins_command_handler(update: Update, context) -> None:
+    message = update.effective_message
+    members = get_gym_member_records(DEFAULT_DATABASE_PATH,is_admin=True)
+    if members:
+        for reply in _process_admin_records(members, "\n\n"):
+            await message.reply_text(reply)
+    else:
+        await message.reply_text(messages.USER_COMMAND_ADMINS_NOT_FOUND_TEXT)
+        
 async def clear_command_handler(update: Update, context) -> None:
     message = update.effective_message
     chat = update.effective_chat
@@ -62,7 +85,7 @@ async def clear_command_handler(update: Update, context) -> None:
     while last_message_id > 0:
         # telegram deletes messages in batches with certain max size
         first_message_id = max(1, last_message_id - CLEAR_BATCH_SIZE + 1)
-        deleted_any = await delete_deletable_messages(
+        deleted_any = await _delete_deletable_messages(
             context.bot,
             chat.id,
             list(range(first_message_id, last_message_id + 1)),
