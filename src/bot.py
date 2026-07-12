@@ -12,6 +12,8 @@ from src.bot_replies import (
     reply_with_start_state,
 )
 from src.keyboards import (
+    GET_STARTING_MESSAGE_CALLBACK,
+
     HOLDER_KEY_HANDOVER_CALLBACK,
     HOLDER_KEY_HANDOVER_CANCEL_CALLBACK,
     
@@ -252,8 +254,15 @@ async def handle_key_obtained_from_mailbox_cancellation(query: CallbackQuery,mes
         message,
         messages.MAILBOX_RECEIVER_CANCELLED_TEXT,
         get_callback_telegram_user_id(query))
-
+async def handle_get_start_message_request(query: CallbackQuery,message: Message) -> None:
+    await query.answer()
+    await edit_to_start_state(
+        message,
+        messages.START_USER_MENU_TEXT,
+        get_callback_telegram_user_id(query))
+    
 CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
+    GET_STARTING_MESSAGE_CALLBACK: handle_get_start_message_request,
     RECEIVER_KEY_INFO_CALLBACK: handle_key_request,
     RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK: handle_key_obtained,
     RECEIVER_MAILBOX_KEY_OBTAINED_CALLBACK: handle_key_obtained_from_mailbox,

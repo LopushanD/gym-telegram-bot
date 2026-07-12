@@ -1,7 +1,7 @@
 from typing import Final
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message
+GET_STARTING_MESSAGE_CALLBACK: Final[str] = "starting_message"
 RECEIVER_KEY_INFO_CALLBACK: Final[str] = "receiver_key_info"
 HOLDER_KEY_HANDOVER_CALLBACK: Final[str] = "holder_key_handover"
 RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK: Final[str] = "handover_receiver_key_obtained"
@@ -65,8 +65,11 @@ def parse_key_id_callback(callback_data: str, prefix: str) -> int:
 
 
 def build_start_keyboard(include_holder_actions: bool = False) -> InlineKeyboardMarkup:
+    keyboard=[]
+    keyboard.append([InlineKeyboardButton("get start message", callback_data=GET_STARTING_MESSAGE_CALLBACK)])
+    keyboard.append([InlineKeyboardButton("Key holder info", callback_data=RECEIVER_KEY_INFO_CALLBACK)])
     if include_holder_actions:
-        keyboard = [
+        keyboard.extend([
             [
                 InlineKeyboardButton(
                     "Hand key over",
@@ -77,17 +80,14 @@ def build_start_keyboard(include_holder_actions: bool = False) -> InlineKeyboard
                     "Return key to mailbox",
                     callback_data=HOLDER_KEY_RETURN_MAILBOX_CALLBACK)
             ]
-        ]
+        ])
     else:
-        keyboard = [
-            [
-                InlineKeyboardButton("Key holder info", callback_data=RECEIVER_KEY_INFO_CALLBACK)
-            ],
+        keyboard.extend([
             [
                 InlineKeyboardButton("Got key from member", callback_data=RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK),
                 InlineKeyboardButton("Got key from mailbox", callback_data=RECEIVER_MAILBOX_KEY_OBTAINED_CALLBACK),
             ],
-        ]
+        ])
     return InlineKeyboardMarkup(keyboard)
 
 def build_key_handover_holder_keyboard() -> InlineKeyboardMarkup:
