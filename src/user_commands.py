@@ -16,7 +16,8 @@ HELP_TEXT = f"""Available commands:
 Shows your Telegram user ID\.
 
 /clear
-Delete all messages from the chat\. In some cases Telegram does not allow to delete messages\. In this case use _'clear history'_ in your chat settings\.
+Delete all messages and get starting message and buttons\. In some cases Telegram does not allow to delete messages\.
+In this case use _'clear history'_ in your chat settings\.
 
 /{TUTORIALS_INFO_TUTORIAL}
 Shows all available tutorials\.

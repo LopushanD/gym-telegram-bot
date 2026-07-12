@@ -13,3 +13,5 @@ Important:
 \- If you opened this flow by mistake, press _"Cancel"_\.
 
 Press on /tutorials to return to the list of tutorials\.
+
+Press on /clear to delete all messages and get starting message and buttons\.

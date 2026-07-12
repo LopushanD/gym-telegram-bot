@@ -59,15 +59,6 @@ from src.telegram_helpers import get_callback_telegram_user_id, get_update_teleg
 
 CallbackHandler = Callable[[CallbackQuery, Message], Awaitable[None]]
 
-
-async def start_state_command_handler(update: Update, context) -> None:
-    await reply_with_start_state(
-        update.effective_message,
-        messages.START_USER_MENU_TEXT,
-        telegram_user_id=get_update_telegram_user_id(update),
-    )
-
-
 async def callback_query_handler(update: Update,context) -> None:
     query = update.callback_query
     received_message = cast(Message, query.message)

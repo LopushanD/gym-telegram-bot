@@ -16,3 +16,5 @@ After the receiver confirms, the bot records them as the new key holder\.
 >\- If you started a handover by mistake, press _"Cancel"_\.
 
 Press on /tutorials to return to the list of tutorials\.
+
+Press on /clear to delete all messages and get starting message and buttons\.

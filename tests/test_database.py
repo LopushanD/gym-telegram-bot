@@ -12,7 +12,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.database import (
     GymMemberAlreadyExistsError,
     add_gym_member,
+    delete_chat_message_ids,
     get_all_current_keyholders_info,
+    get_chat_message_ids,
     get_current_keyholder_info,
     get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
@@ -28,6 +30,7 @@ from src.database import (
     populate_members_table_with_mock_data,
     populate_test_mailboxes_and_keys,
     set_key_active,
+    store_chat_message_id,
     update_gym_member,
 )
 from src.models import GymMember, KeyHolder, KeyStatus
@@ -113,6 +116,126 @@ class DatabaseTests(unittest.TestCase):
             self.assertIn("gym_members", table_names)
             self.assertIn("keys", table_names)
             self.assertIn("key_holder_history", table_names)
+            self.assertIn("chat_messages", table_names)
+
+    def test_chat_messages_reference_gym_member_telegram_user_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            connection = sqlite3.connect(database_path)
+            try:
+                foreign_keys = connection.execute(
+                    "PRAGMA foreign_key_list(chat_messages)"
+                ).fetchall()
+            finally:
+                connection.close()
+
+            referenced_columns = {
+                foreign_key[3]: (foreign_key[2], foreign_key[4])
+                for foreign_key in foreign_keys
+            }
+            self.assertEqual(
+                ("gym_members", "telegram_user_id"),
+                referenced_columns["chat_id"],
+            )
+
+    def test_store_chat_message_id_tracks_messages_by_chat(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            connection = sqlite3.connect(database_path)
+            try:
+                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
+                create_gym_member_with_telegram_user_id(connection, 400, "Petrov", 102)
+                connection.commit()
+            finally:
+                connection.close()
+
+            store_chat_message_id(database_path, chat_id=300, message_id=10)
+            store_chat_message_id(database_path, chat_id=300, message_id=11)
+            store_chat_message_id(database_path, chat_id=400, message_id=99)
+
+            self.assertEqual([10, 11], get_chat_message_ids(database_path, 300))
+
+    def test_store_chat_message_id_ignores_duplicate_message_in_same_chat(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            connection = sqlite3.connect(database_path)
+            try:
+                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
+                connection.commit()
+            finally:
+                connection.close()
+
+            store_chat_message_id(database_path, chat_id=300, message_id=10)
+            store_chat_message_id(database_path, chat_id=300, message_id=10)
+
+            self.assertEqual([10], get_chat_message_ids(database_path, 300))
+
+    def test_store_chat_message_id_rejects_missing_gym_member(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+
+            with self.assertRaises(sqlite3.IntegrityError):
+                store_chat_message_id(database_path, chat_id=300, message_id=10)
+
+    def test_delete_chat_message_ids_deletes_requested_messages_in_chat(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            connection = sqlite3.connect(database_path)
+            try:
+                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
+                create_gym_member_with_telegram_user_id(connection, 400, "Petrov", 102)
+                connection.commit()
+            finally:
+                connection.close()
+
+            store_chat_message_id(database_path, chat_id=300, message_id=10)
+            store_chat_message_id(database_path, chat_id=300, message_id=11)
+            store_chat_message_id(database_path, chat_id=400, message_id=10)
+
+            deleted_count = delete_chat_message_ids(database_path, 300, [10])
+
+            self.assertEqual(1, deleted_count)
+            self.assertEqual([11], get_chat_message_ids(database_path, 300))
+            self.assertEqual([10], get_chat_message_ids(database_path, 400))
+
+    def test_delete_chat_message_ids_always_deletes_old_messages_in_chat(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            connection = sqlite3.connect(database_path)
+            try:
+                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
+                connection.commit()
+            finally:
+                connection.close()
+
+            store_chat_message_id(database_path, chat_id=300, message_id=10)
+            store_chat_message_id(database_path, chat_id=300, message_id=11)
+            store_chat_message_id(database_path, chat_id=300, message_id=12)
+            connection = sqlite3.connect(database_path)
+            try:
+                connection.execute(
+                    """
+                    UPDATE chat_messages
+                    SET created_at = datetime('now', '-49 hours')
+                    WHERE chat_id = ? AND message_id = ?
+                    """,
+                    (300, 12),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            deleted_count = delete_chat_message_ids(database_path, 300, [10])
+
+            self.assertEqual(2, deleted_count)
+            self.assertEqual([11], get_chat_message_ids(database_path, 300))
 
     def test_initialize_database_can_run_more_than_once(self):
         with tempfile.TemporaryDirectory() as directory:

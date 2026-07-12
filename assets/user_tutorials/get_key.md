@@ -33,3 +33,5 @@ The handover must be confirmed before it expires\. If it expires, ask the holder
 Once confirmed, you are responsible for the key until you hand it to another member or return it to the mailbox\.
 
 Press on /tutorials to return to the list of tutorials\.
+
+Press on /clear to delete all messages and get starting message and buttons\.
