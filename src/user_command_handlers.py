@@ -1,27 +1,15 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from telegram.error import TelegramError
 import asyncio
 from src.bot_replies import reply_with_start_state
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH,TELEGRAM_MESSAGE_LIMIT
+from src.config import DEFAULT_DATABASE_PATH
 from src.telegram_helpers import get_update_telegram_user_id
-from src.database import get_gym_member_records,GymMember
+from src.database import get_gym_member_records
+from src.command_handlers_utility import process_gym_member_records
 from src.user_commands import *
 
 DELETE_LAST_N_MESSAGES = 90
-
-def _process_admin_records(members: list[GymMember], separator: str) -> list[str]:
-    replies = []
-    for member in members:
-        record = "\n".join(["Name: "+member.full_name,"Room: "+str(member.room_number),
-        "Telegram username: "+member.telegram_name if member.telegram_name is not None else "--"]) 
-        #checks if message length is enough or another message is needed to fit everything
-        if replies and len(replies[-1]) + len(separator) + len(record) <= TELEGRAM_MESSAGE_LIMIT:
-            replies[-1] += separator + record
-        else:
-            replies.append(record)
-    return replies
 
 async def start_state_command_handler(update: Update, context:ContextTypes.DEFAULT_TYPE) -> None:
     await reply_with_start_state(
@@ -65,7 +53,7 @@ async def show_admins_command_handler(update: Update, context:ContextTypes.DEFAU
     message = update.effective_message
     members = get_gym_member_records(DEFAULT_DATABASE_PATH,is_admin=True)
     if members:
-        for reply in _process_admin_records(members, "\n"+"-"*10+"\n"):
+        for reply in process_gym_member_records(members, "\n"+"-"*10+"\n"):
             await message.reply_text(reply)
     else:
         await message.reply_text(messages.USER_COMMAND_ADMINS_NOT_FOUND_TEXT)

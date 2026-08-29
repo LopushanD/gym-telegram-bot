@@ -19,6 +19,7 @@ This is different from your Telegram username, such as @username\.
 >3\. Select _"Username"_\.
 >4\. Enter an available username and save it\.
 You can find list of authorized Gym AG members via /admins command\.
+<!-- TODO make @username not clickable  -->
 Just tap on their @username, start a chat and send the information described above\.
 
 3\. The Gym AG member will add you to the bot database\.

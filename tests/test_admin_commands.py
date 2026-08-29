@@ -29,7 +29,7 @@ from src.admin_command_handlers import (
     give_key_command_handler,
     key_history_command_handler,
     key_status_command_handler,
-    _parse_update_user_arguments,
+    parse_update_user_command_arguments,
     update_user_command_handler,
     users_command_handler,
 )
@@ -435,7 +435,7 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class UpdateUserArgumentTests(unittest.TestCase):
     def test_parses_options_in_any_order(self):
-        telegram_user_id, updates = _parse_update_user_arguments(
+        telegram_user_id, updates = parse_update_user_command_arguments(
             ["200", "-p", "+49123", "--room", "4321", "-n", "Ada"]
         )
 
@@ -462,7 +462,7 @@ class UpdateUserArgumentTests(unittest.TestCase):
         for arguments in invalid_arguments:
             with self.subTest(arguments=arguments):
                 with self.assertRaises(UpdateUserUsageError):
-                    _parse_update_user_arguments(arguments)
+                    parse_update_user_command_arguments(arguments)
 
     def test_rejects_invalid_numeric_values(self):
         for arguments in (
@@ -473,7 +473,7 @@ class UpdateUserArgumentTests(unittest.TestCase):
         ):
             with self.subTest(arguments=arguments):
                 with self.assertRaises(ValueError):
-                    _parse_update_user_arguments(arguments)
+                    parse_update_user_command_arguments(arguments)
 
     def test_formats_only_actual_changes(self):
         member_before = build_member(200)

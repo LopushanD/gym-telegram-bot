@@ -63,7 +63,7 @@ ADMIN_UPDATE_USER_USAGE_TEXT = (
 ADMIN_UPDATE_USER_NOT_FOUND_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
 ADMIN_UPDATE_USER_NO_CHANGES_TEXT = "No user data changed for Telegram ID {telegram_user_id}."
 ADMIN_UPDATE_USER_COMPLETED_TEXT = "Updated gym member with Telegram ID {telegram_user_id}:\n{changes}"
-ADMIN_USERS_USAGE_TEXT = "Usage: /users [name] [surname] [room]"
+ADMIN_USERS_USAGE_TEXT = "Usage: /users [-n or --name Value] [-s or --surname Value] [-n or --room Value]"
 ADMIN_USERS_NOT_FOUND_TEXT = "No gym members matched the query."
 ADMIN_KEY_HISTORY_USAGE_TEXT = "Usage: /keyhistory key_id [last_n_records]"
 ADMIN_KEY_HISTORY_NOT_FOUND_TEXT = "key holder history was not found."
@@ -107,16 +107,8 @@ def gym_member_record_text(member: GymMember) -> str:
             f"Admin: {'yes' if member.is_admin else 'no'}",
         )
     )
-
-
-def key_history_record_text(record: KeyHistoryRecord) -> str:
-    return (
-        f"{record.taken_at:%Y-%m-%d %H:%M:%S} UTC: "
-        f"key {record.key_id} received by {record.member.full_name}, "
-        f"room {record.member.room_number}."
-    )
-
-
+# TODO just like function above, think about moving such procesing functions to command_handlers_utility.py file
+# or creating dedicated file formatting functions 
 def key_status_text(status: KeyStatus) -> str:
     return "\n".join(
         (

@@ -6,14 +6,12 @@ Use this to find member records and check details such as Telegram ID, room, Tel
 
 *Usage*
 
-`/users [name] [surname] [room]`
+`/users [-n or --name Value] [-s or --surname Value] [-n or --room Value]`
 
 Optional filters:
-\- `name`: filter by first name\.
-\- `surname`: filter by surname\.
-\- `room`: filter by room number\.
-
-Filters are positional\. To filter by room, provide name and surname before the room number\.
+\- `-n` or `--name`: filter by first name\.
+\- `-s` or `--surname`: filter by surname\.
+\- `-r` or `--room`: filter by room number\.
 
 *Examples*
 
@@ -21,19 +19,18 @@ Filters are positional\. To filter by room, provide name and surname before the 
 
 Lists all registered gym members\.
 
-`/users Ada`
+`/users -n Ada`
 
 Lists members with the name Ada\.
 
-`/users Ada Lovelace`
+`/users -s Lovelace`
 
-Lists members with the name Ada and surname Lovelace\.
+Lists members with the surname Lovelace\.
 
-`/users Ada Lovelace 1204`
+`/users -n Ada -r 1204`
 
-Lists members named Ada Lovelace in room 1204\.
+Lists members named Ada who live in room 1204\.
 
 >Important:
 >\- `room` must be a positive number when supplied\.
->\- You cannot filter by surname or room alone with this command format\.
 >\- Large result sets may be split across multiple bot messages\.

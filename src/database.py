@@ -357,7 +357,7 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
     )
 
 
-def set_key_active(database_path, key_id: int, is_active: bool) -> bool:
+def set_key_active(database_path, key_id: int, do_activate: bool) -> bool:
     """Set a key's active status and return whether the key exists."""
     with sqlite3.connect(database_path) as connection:
         cursor = connection.execute(
@@ -366,7 +366,7 @@ def set_key_active(database_path, key_id: int, is_active: bool) -> bool:
             SET is_active = ?
             WHERE id = ?
             """,
-            (int(is_active), key_id),
+            (int(do_activate), key_id),
         )
     return cursor.rowcount > 0
 
@@ -494,7 +494,6 @@ def get_gym_member_records(database_path,name=None,surname=None,room_number=None
         _gym_member_from_row(member)
         for member in members
     ]
-
 
 def add_gym_member(
     database_path,
