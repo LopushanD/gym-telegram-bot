@@ -1,8 +1,8 @@
 from telegram import Update
-from src.admin_commands import *
 from src import messages
-from src.command_handlers_utility import *
 from src.config import DEFAULT_DATABASE_PATH,LAST_N_RECORDS_DEFAULT
+from src.admin_commands import *
+from src.command_handlers_utility import *
 from src.database import (
     GymMemberAlreadyExistsError,
     add_gym_member,
@@ -22,22 +22,23 @@ async def reply_with_command_documentation(message, command_name: str) -> None:
         load_command_documentation(command_name),
         parse_mode="MarkdownV2",
     )
-
-async def add_user_command_handler(update: Update, context) -> None:
-    #TODO: refactor admin checking part
-    
+async def _user_is_admin(update:Update)->bool:
     message = update.effective_message
     requesting_member = get_gym_member_by_telegram_user_id(
         DEFAULT_DATABASE_PATH,
-        get_update_telegram_user_id(update),
-    )
+        get_update_telegram_user_id(update))
     if requesting_member is None:
         await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
-        return
+        return False
     if not requesting_member.is_admin:
         await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
-        return
+        return False
+    return True
 
+async def add_user_command_handler(update: Update, context) -> None:
+    message = update.effective_message
+    if not await _user_is_admin(update):
+        return
     arguments = getattr(context, "args", [])
     if is_help_request(arguments):
         await reply_with_command_documentation(message, ADD_USER_ADMIN_COMMAND)
@@ -80,36 +81,18 @@ async def add_user_command_handler(update: Update, context) -> None:
             telegram_user_id=telegram_user_id,
             room_number=room_number,
         )
-
     await message.reply_text(reply)
 
 async def get_all_commands_handler(update: Update, context) -> None:
     message = update.effective_message
-    requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH, get_update_telegram_user_id(update))
-    if requesting_member is None:
-        await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
-        return
-    if not requesting_member.is_admin:
-        await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
+    if not await _user_is_admin(update):
         return
     await reply_with_command_documentation(message, ALL_COMMANDS_ADMIN_COMMAND)
 
 async def give_key_command_handler(update: Update, context) -> None:
-    #TODO: refactor admin checking part
-    
     message = update.effective_message
-    requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
-        get_update_telegram_user_id(update),
-    )
-    if requesting_member is None :
-        await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
+    if not await _user_is_admin(update):
         return
-    elif not requesting_member.is_admin:
-        await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
-        return
-
     arguments = getattr(context, "args", [])
     if is_help_request(arguments):
         await reply_with_command_documentation(message, GIVE_KEY_ADMIN_COMMAND)
@@ -118,7 +101,8 @@ async def give_key_command_handler(update: Update, context) -> None:
     if len(arguments) != 2:
         await message.reply_text(messages.ADMIN_GIVE_KEY_USAGE_TEXT)
         return
-
+    #================
+    #TODO this block of code seems redundant and unnessesary
     try:
         key_id, telegram_user_id = (int(argument) for argument in arguments)
     except ValueError:
@@ -128,7 +112,7 @@ async def give_key_command_handler(update: Update, context) -> None:
     if key_id <= 0 or telegram_user_id <= 0:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
-
+    #======================
     result = give_key_to_member(DEFAULT_DATABASE_PATH, key_id, telegram_user_id)
     if result.status == GiveKeyStatus.USER_NOT_REGISTERED:
         reply = messages.ADMIN_GIVE_KEY_USER_NOT_REGISTERED_TEXT.format(
@@ -138,6 +122,7 @@ async def give_key_command_handler(update: Update, context) -> None:
     elif result.status == GiveKeyStatus.GIVEN:
         if result.member is None:
             raise ValueError("given key result is missing the target member")
+        # TODO why do we need to cancel pending handover? just to be sure?
         cancel_pending_handover(key_id)
         reply = messages.ADMIN_GIVE_KEY_COMPLETED_TEXT.format(
             key_id=key_id,
@@ -148,21 +133,10 @@ async def give_key_command_handler(update: Update, context) -> None:
         raise ValueError(f"unsupported give key status: {result.status}")
     await message.reply_text(reply)
 
-
 async def update_user_command_handler(update: Update, context) -> None:
-    #TODO: refactor admin checking part
     message = update.effective_message
-    requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
-        get_update_telegram_user_id(update),
-    )
-    if requesting_member is None:
-        await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
+    if not await _user_is_admin(update):
         return
-    if not requesting_member.is_admin:
-        await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
-        return
-
     arguments = getattr(context, "args", [])
     if is_help_request(arguments):
         await reply_with_command_documentation(message, UPDATE_USER_ADMIN_COMMAND)
@@ -180,21 +154,17 @@ async def update_user_command_handler(update: Update, context) -> None:
 
     member_before = get_gym_member_by_telegram_user_id(
         DEFAULT_DATABASE_PATH,
-        telegram_user_id,
-    )
+        telegram_user_id)
     if member_before is None:
         await message.reply_text(
             messages.ADMIN_UPDATE_USER_NOT_FOUND_TEXT.format(
-                telegram_user_id=telegram_user_id,
-            )
-        )
+                telegram_user_id=telegram_user_id))
         return
-
+    # TODO check this code, reformat if needed
     member_after = update_gym_member(
         DEFAULT_DATABASE_PATH,
         telegram_user_id,
-        **updates,
-    )
+        **updates)
     if member_after is None:
         raise RuntimeError("updated gym member could not be loaded")
 
@@ -210,21 +180,10 @@ async def update_user_command_handler(update: Update, context) -> None:
         )
     await message.reply_text(reply)
 
-
 async def users_command_handler(update: Update, context) -> None:
-    #TODO: refactor admin checking part
     message = update.effective_message
-    requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
-        get_update_telegram_user_id(update),
-    )
-    if requesting_member is None:
-        await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
+    if not await _user_is_admin(update):
         return
-    if not requesting_member.is_admin:
-        await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
-        return
-
     arguments = getattr(context, "args", [])
     if is_help_request(arguments):
         await reply_with_command_documentation(message, SHOW_USERS_ADMIN_COMMAND)
@@ -248,19 +207,9 @@ async def users_command_handler(update: Update, context) -> None:
         await message.reply_text(str(e))
 
 async def key_history_command_handler(update: Update, context) -> None:
-    #TODO: refactor admin checking part
     message = update.effective_message
-    requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
-        get_update_telegram_user_id(update),
-    )
-    if requesting_member is None:
-        await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
+    if not await _user_is_admin(update):
         return
-    if not requesting_member.is_admin:
-        await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
-        return
-
     arguments = getattr(context, "args", [])
     if is_help_request(arguments):
         await reply_with_command_documentation(message, SHOW_KEY_HISTORY_ADMIN_COMMAND)
@@ -289,19 +238,9 @@ async def key_history_command_handler(update: Update, context) -> None:
         await message.reply_text(messages.ADMIN_KEY_HISTORY_NOT_FOUND_TEXT)
 
 async def key_status_command_handler(update: Update, context) -> None:
-    #TODO: refactor admin checking part
     message = update.effective_message
-    requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
-        get_update_telegram_user_id(update),
-    )
-    if requesting_member is None:
-        await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
+    if not await _user_is_admin(update):
         return
-    if not requesting_member.is_admin:
-        await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
-        return
-
     arguments = getattr(context, "args", [])
     if is_help_request(arguments):
         await reply_with_command_documentation(message, SHOW_KEY_STATUS_ADMIN_COMMAND)
@@ -329,26 +268,14 @@ async def key_status_command_handler(update: Update, context) -> None:
 
     await message.reply_text(messages.key_status_text(status))
 
-
 async def set_key_active_command_handler(
-    #TODO: refactor admin checking part
     update: Update,
     context,
     *,
-    do_activate: bool,
-) -> None:
+    do_activate: bool) -> None:
     message = update.effective_message
-    requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
-        get_update_telegram_user_id(update),
-    )
-    if requesting_member is None:
-        await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
+    if not await _user_is_admin(update):
         return
-    if not requesting_member.is_admin:
-        await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
-        return
-
     arguments = getattr(context, "args", [])
     if is_help_request(arguments):
         command_name = (
@@ -384,8 +311,7 @@ async def set_key_active_command_handler(
     reply = (
         messages.ADMIN_ACTIVATE_KEY_COMPLETED_TEXT
         if do_activate
-        else messages.ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT
-    )
+        else messages.ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT)
     await message.reply_text(reply.format(key_id=key_id))
     
 # Adapters to make handlers compatible with Telegram API

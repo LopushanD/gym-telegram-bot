@@ -5,7 +5,7 @@ Before you can use the key tracking features, a Gym AG member must register you 
 1\. Send this command to the bot:
 /mytelegramid
 The bot will reply with your Telegram user ID\.
-This is different from your Telegram username, such as @username\.
+This is different from your Telegram username, such as `@username`\.
 
 2\. Send the following information to an authorized Gym AG member:
 \- Telegram user ID
@@ -18,8 +18,7 @@ This is different from your Telegram username, such as @username\.
 >3\. Select _"Username"_\.
 >4\. Enter an available username and save it\.
 You can find list of authorized Gym AG members via /admins command\.
-<!-- TODO make @username not clickable  -->
-Just tap on their @username, start a chat and send the information described above\.
+Just tap on their `@username`, start a chat and send the information described above\.
 
 3\. The Gym AG member will add you to the bot database\.
 
