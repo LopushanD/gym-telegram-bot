@@ -10,15 +10,12 @@ GYM_MEMBER_OPTION_FIELDS = {
     "--room": "room_number",
     "-t": "telegram_name",
     "--telegram-name": "telegram_name",
-    "-p": "phone_number",
-    "--phone-number": "phone_number",
 }
 GYM_MEMBER_FIELD_LABELS = {
     "name": "Name",
     "surname": "Surname",
     "room_number": "Room",
     "telegram_name": "Telegram name",
-    "phone_number": "Phone number",
 }
 
 def _split_record_texts(record_texts: list[str], separator: str) -> list[str]:
@@ -35,9 +32,10 @@ def process_gym_member_records(members: list[GymMember], separator: str) -> list
     replies = []
     records = []
     for member in members:
-        #TODO: remove phone number, make telegram name always appear, move Telegram_id to the very bottom
-        record = "\n".join(["Gym member ID: "+str(member.id),"Name: "+member.full_name,"Room: "+str(member.room_number),
-        "Telegram username: "+member.telegram_name if member.telegram_name is not None else "--",
+        record = "\n".join([
+        "Gym member ID: "+str(member.id),"Name: "+member.full_name,
+        "Room: "+str(member.room_number),
+        "Telegram username: "+member.telegram_name if member.telegram_name is not None else "Telegram username: None",
         "Telegram ID: "+str(member.telegram_user_id)])
         records.append(record)
     replies = _split_record_texts(records,separator)
@@ -89,7 +87,7 @@ def parse_update_user_command_arguments(arguments: list[str]) -> tuple[int, dict
     updates: dict[str, str | int] = {}
     for option, value in zip(arguments[1::2], arguments[2::2]):
         field = GYM_MEMBER_OPTION_FIELDS.get(option)
-        if field is None or field in updates or value.startswith("--"):
+        if field is None or field in updates or value.startswith("-"):
             raise UpdateUserUsageError
         updates[field] = value
 
@@ -112,7 +110,7 @@ def parse_user_command_arguments(arguments: list[str]) -> dict[str, str | None]:
     result: dict[str, str|None] = {"name":None,"surname":None,"room_number":None}
     for option, value in zip(arguments[0::2], arguments[1::2]):
         field = GYM_MEMBER_OPTION_FIELDS.get(option)
-        if field is None or field not in result.keys() or value.startswith("--"):
+        if field is None or field not in result.keys() or value.startswith("-"):
             raise UserCommandUsageError
         else:
             result[field] = value

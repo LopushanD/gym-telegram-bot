@@ -25,7 +25,7 @@ from src.admin_command_handlers import (
     activate_key_command_handler,
     add_user_command_handler,
     deactivate_key_command_handler,
-    _format_gym_member_changes,
+    format_gym_member_changes,
     give_key_command_handler,
     key_history_command_handler,
     key_status_command_handler,
@@ -47,7 +47,6 @@ def build_member(telegram_user_id: int, *, is_admin: bool = False) -> GymMember:
         surname="Ivanov",
         room_number=1234,
         telegram_name="@dima",
-        phone_number=None,
         is_admin=is_admin,
     )
 
@@ -300,13 +299,19 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch("src.admin_command_handlers.add_gym_member") as add_member,
         ):
-            await add_user_command_handler(
-                self.update,
-                SimpleNamespace(args=["200", "Ada", "Lovelace"]),
-            )
+            for arguments in (
+                ["200", "Ada", "Lovelace", "1234"],
+                ["200", "Ada", "Lovelace", "1234", "@ada", "+49123"],
+            ):
+                with self.subTest(arguments=arguments):
+                    await add_user_command_handler(
+                        self.update,
+                        SimpleNamespace(args=arguments),
+                    )
 
-        self.message.reply_text.assert_awaited_once_with(
-            messages.ADMIN_ADD_USER_USAGE_TEXT,
+        self.assertEqual(2, self.message.reply_text.await_count)
+        self.message.reply_text.assert_has_awaits(
+            [call(messages.ADMIN_ADD_USER_USAGE_TEXT)] * 2
         )
         add_member.assert_not_called()
 
@@ -320,7 +325,9 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
         ):
             await add_user_command_handler(
                 self.update,
-                SimpleNamespace(args=["200", "Ada", "Lovelace", "not-a-room"]),
+                SimpleNamespace(
+                    args=["200", "Ada", "Lovelace", "not-a-room", "@ada"]
+                ),
             )
 
         self.message.reply_text.assert_awaited_once_with(
@@ -341,7 +348,7 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
         ):
             await add_user_command_handler(
                 self.update,
-                SimpleNamespace(args=["200", "Ada", "Lovelace", "1234"]),
+                SimpleNamespace(args=["200", "Ada", "Lovelace", "1234", "@ada"]),
             )
 
         self.message.reply_text.assert_awaited_once_with(
@@ -350,7 +357,7 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-    async def test_adds_user_with_optional_contact_data(self):
+    async def test_adds_user_with_required_telegram_name(self):
         member = GymMember(
             id=20,
             telegram_user_id=200,
@@ -358,7 +365,6 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
             surname="Lovelace",
             room_number=1234,
             telegram_name="@ada",
-            phone_number="+49123456789",
             is_admin=False,
         )
         with (
@@ -371,14 +377,7 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
             await add_user_command_handler(
                 self.update,
                 SimpleNamespace(
-                    args=[
-                        "200",
-                        "Ada",
-                        "Lovelace",
-                        "1234",
-                        "@ada",
-                        "+49123456789",
-                    ],
+                    args=["200", "Ada", "Lovelace", "1234", "@ada"],
                 ),
             )
 
@@ -389,7 +388,6 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
             surname="Lovelace",
             room_number=1234,
             telegram_name="@ada",
-            phone_number="+49123456789",
         )
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_ADD_USER_COMPLETED_TEXT.format(
@@ -399,50 +397,35 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-    async def test_adds_user_without_optional_contact_data(self):
-        member = GymMember(
-            id=20,
-            telegram_user_id=200,
-            name="Ada",
-            surname="Lovelace",
-            room_number=1234,
-            telegram_name=None,
-            phone_number=None,
-            is_admin=False,
-        )
+    async def test_rejects_user_without_telegram_name(self):
         with (
             patch(
                 "src.admin_command_handlers.get_gym_member_by_telegram_user_id",
                 return_value=build_member(100, is_admin=True),
             ),
-            patch("src.admin_command_handlers.add_gym_member", return_value=member) as add_member,
+            patch("src.admin_command_handlers.add_gym_member") as add_member,
         ):
             await add_user_command_handler(
                 self.update,
                 SimpleNamespace(args=["200", "Ada", "Lovelace", "1234"]),
             )
 
-        add_member.assert_called_once_with(
-            DEFAULT_DATABASE_PATH,
-            telegram_user_id=200,
-            name="Ada",
-            surname="Lovelace",
-            room_number=1234,
-            telegram_name=None,
-            phone_number=None,
+        add_member.assert_not_called()
+        self.message.reply_text.assert_awaited_once_with(
+            messages.ADMIN_ADD_USER_USAGE_TEXT
         )
 
 
 class UpdateUserArgumentTests(unittest.TestCase):
     def test_parses_options_in_any_order(self):
         telegram_user_id, updates = parse_update_user_command_arguments(
-            ["200", "-p", "+49123", "--room", "4321", "-n", "Ada"]
+            ["200", "-t", "@ada", "--room", "4321", "-n", "Ada"]
         )
 
         self.assertEqual(200, telegram_user_id)
         self.assertEqual(
             {
-                "phone_number": "+49123",
+                "telegram_name": "@ada",
                 "room_number": 4321,
                 "name": "Ada",
             },
@@ -452,6 +435,7 @@ class UpdateUserArgumentTests(unittest.TestCase):
     def test_rejects_unknown_duplicate_and_missing_options(self):
         invalid_arguments = (
             ["200", "--unknown", "value"],
+            ["200", "--phone-number", "+49123"],
             ["200", "--name", "Ada", "--name", "Grace"],
             ["200", "-n", "Ada", "--name", "Grace"],
             ["200", "--name"],
@@ -484,13 +468,12 @@ class UpdateUserArgumentTests(unittest.TestCase):
             surname=member_before.surname,
             room_number=4321,
             telegram_name=member_before.telegram_name,
-            phone_number=member_before.phone_number,
             is_admin=False,
         )
 
         self.assertEqual(
             "Name: Dima -> Ada\nRoom: 1234 -> 4321",
-            _format_gym_member_changes(member_before, member_after),
+            format_gym_member_changes(member_before, member_after),
         )
 
 
@@ -581,7 +564,6 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
             surname=member_before.surname,
             room_number=4321,
             telegram_name=member_before.telegram_name,
-            phone_number=member_before.phone_number,
             is_admin=False,
         )
         with (
@@ -722,7 +704,6 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
                 surname="Lovelace",
                 room_number=1234,
                 telegram_name="@ada",
-                phone_number="+49123456789",
                 is_admin=True,
             ),
             GymMember(
@@ -732,7 +713,6 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
                 surname="Turing",
                 room_number=1235,
                 telegram_name=None,
-                phone_number=None,
                 is_admin=False,
             ),
         ]
@@ -761,8 +741,8 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_splits_large_results_between_telegram_messages(self):
         members = [
-            GymMember(1, 100, "A", "One", 1001, None, None, False),
-            GymMember(2, 200, "B", "Two", 1002, None, None, False),
+            GymMember(1, 100, "A", "One", 1001, None, False),
+            GymMember(2, 200, "B", "Two", 1002, None, False),
         ]
         member_texts = ["a" * 3000, "b" * 3000]
         with (
@@ -961,7 +941,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
         status = KeyStatus(
             key_id=1,
             current_holder=build_member(200),
-            owner=GymMember(20, 300, "Key", "Mailbox", 4321, None, None, False),
+            owner=GymMember(20, 300, "Key", "Mailbox", 4321, None, False),
             is_active=True,
         )
         with (

@@ -35,7 +35,6 @@ class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
             surname="Holder",
             room_number=101,
             telegram_name=None,
-            phone_number=None,
             is_admin=False,
         )
 
@@ -74,7 +73,6 @@ class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
                 surname="Holder",
                 room_number=101,
                 telegram_name=None,
-                phone_number=None,
                 is_admin=False,
             ),
             message=SimpleNamespace(),
@@ -101,7 +99,6 @@ class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
                 surname="Holder",
                 room_number=101,
                 telegram_name=None,
-                phone_number=None,
                 is_admin=False,
             ),
             message=pending_message,
@@ -127,7 +124,6 @@ class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
                     surname="Receiver",
                     room_number=102,
                     telegram_name=None,
-                    phone_number=None,
                     is_admin=False,
                 ),
                 key_id=1,

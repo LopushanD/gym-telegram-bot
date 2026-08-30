@@ -2,7 +2,7 @@
 
 Updates selected fields of an existing gym member record\.
 
-Use this when a member changes room, contact details, or name data\. Only the fields you specify are changed\.
+Use this when a member changes room, Telegram username, or name data\. Only the fields you specify are changed\.
 
 *Usage*
 
@@ -16,7 +16,6 @@ Available options:
 \- `-s` or `--surname`: update the surname\.
 \- `-r` or `--room`: update the room number\.
 \- `-t` or `--telegram-name`: update the Telegram username\.
-\- `-p` or `--phone-number`: update the phone number\.
 
 Options can be supplied in any order\.
 
@@ -26,9 +25,9 @@ Options can be supplied in any order\.
 
 Updates only the member's room number\.
 
-`/updateuser 123456789 -t @ada -p +49123456789`
+`/updateuser 123456789 -t @ada`
 
-Updates Telegram username and phone number\.
+Updates the Telegram username\.
 
 `/updateuser 123456789 --surname Byron --name Ada --room 1302`
 
@@ -39,6 +38,7 @@ Updates surname, name, and room in one command\.
 `/updateuser 123456789 -n Ada --telegram-name @ada`
 
 >Important:
+>\- If a gym member changed Telegram ID \(Made new TG account\), do not use this command\. Simply delete the old gym member's data \(with old TG ID\) and add the new one, just like with new gym members\. 
 >\- At least one option and value pair is required\.
 >\- Each field can be supplied only once per command\.
 >\- `telegram_id` and `room` must be positive numbers\.

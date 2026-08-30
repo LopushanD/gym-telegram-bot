@@ -42,14 +42,13 @@ def create_gym_member(
     room_number,
     name="Alex",
     telegram_name=None,
-    phone_number=None,
 ):
     cursor = connection.execute(
         """
-        INSERT INTO gym_members (name, surname, room_number, telegram_name, phone_number)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO gym_members (name, surname, room_number, telegram_name)
+        VALUES (?, ?, ?, ?)
         """,
-        (name, surname, room_number, telegram_name, phone_number),
+        (name, surname, room_number, telegram_name),
     )
     return cursor.lastrowid
 
@@ -61,7 +60,6 @@ def create_gym_member_with_telegram_user_id(
     room_number,
     name="Alex",
     telegram_name=None,
-    phone_number=None,
 ):
     cursor = connection.execute(
         """
@@ -70,12 +68,11 @@ def create_gym_member_with_telegram_user_id(
             name,
             surname,
             room_number,
-            telegram_name,
-            phone_number
+            telegram_name
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (telegram_user_id, name, surname, room_number, telegram_name, phone_number),
+        (telegram_user_id, name, surname, room_number, telegram_name),
     )
     return cursor.lastrowid
 
@@ -255,7 +252,7 @@ class DatabaseTests(unittest.TestCase):
 
             self.assertEqual(("gym_members",), gym_members_table)
 
-    def test_initialize_database_creates_gym_member_contact_columns(self):
+    def test_initialize_database_creates_required_member_columns_without_phone(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
 
@@ -268,9 +265,9 @@ class DatabaseTests(unittest.TestCase):
                 }
 
             self.assertIn("telegram_name", column_names)
-            self.assertIn("phone_number", column_names)
+            self.assertNotIn("phone_number", column_names)
 
-    def test_initialize_database_adds_contact_columns_to_existing_members_table(self):
+    def test_initialize_database_removes_phone_column_from_existing_members_table(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
 
@@ -283,7 +280,10 @@ class DatabaseTests(unittest.TestCase):
                         name TEXT,
                         surname TEXT NOT NULL,
                         room_number INTEGER NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        telegram_name TEXT,
+                        phone_number TEXT,
+                        is_admin INTEGER NOT NULL DEFAULT 0
                     )
                     """
                 )
@@ -297,7 +297,7 @@ class DatabaseTests(unittest.TestCase):
                 }
 
             self.assertIn("telegram_name", column_names)
-            self.assertIn("phone_number", column_names)
+            self.assertNotIn("phone_number", column_names)
 
     def test_keys_members_reference_gym_members(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -335,8 +335,7 @@ class DatabaseTests(unittest.TestCase):
                         surname TEXT NOT NULL,
                         room_number INTEGER NOT NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        telegram_name TEXT,
-                        phone_number TEXT
+                        telegram_name TEXT
                     )
                     """
                 )
@@ -521,7 +520,6 @@ class DatabaseTests(unittest.TestCase):
                     surname="Ivanov",
                     room_number=101,
                     telegram_name=None,
-                    phone_number=None,
                     is_admin=False,
                 ),
                 owner,
@@ -569,8 +567,7 @@ class DatabaseTests(unittest.TestCase):
                         name,
                         surname,
                         room_number,
-                        telegram_name,
-                        phone_number
+                        telegram_name
                     FROM gym_members
                     ORDER BY id
                     """
@@ -590,7 +587,6 @@ class DatabaseTests(unittest.TestCase):
                 surname,
                 room_number,
                 telegram_name,
-                phone_number,
             ) in members:
                 self.assertIsInstance(telegram_user_id, int)
                 self.assertTrue(name)
@@ -598,7 +594,6 @@ class DatabaseTests(unittest.TestCase):
                 self.assertGreaterEqual(room_number, 1000)
                 self.assertLessEqual(room_number, 9999)
                 self.assertTrue(telegram_name.startswith("@"))
-                self.assertTrue(phone_number.startswith("+491"))
 
     def test_populate_members_table_with_mock_data_rejects_negative_member_count(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -624,8 +619,7 @@ class DatabaseTests(unittest.TestCase):
                         name,
                         surname,
                         room_number,
-                        telegram_name,
-                        phone_number
+                        telegram_name
                     FROM gym_members
                     ORDER BY id
                     """
@@ -640,9 +634,9 @@ class DatabaseTests(unittest.TestCase):
 
             self.assertEqual(
                 [
-                    (mailbox_ids[0], 0, "Dima's", "Mailbox", 1001, None, None),
-                    (mailbox_ids[1], -1, "Second", "Mailbox", 3062, None, None),
-                    (mailbox_ids[2], -2, "Last", "Mailbox", 9999, None, None),
+                    (mailbox_ids[0], 0, "Dima's", "Mailbox", 1001, None),
+                    (mailbox_ids[1], -1, "Second", "Mailbox", 3062, None),
+                    (mailbox_ids[2], -2, "Last", "Mailbox", 9999, None),
                 ],
                 mailboxes,
             )
@@ -690,7 +684,6 @@ class DatabaseTests(unittest.TestCase):
                     1234,
                     name="Dima",
                     telegram_name="@dima",
-                    phone_number="+49123456789",
                 )
                 key_id = create_key(connection, holder_id)
 
@@ -706,7 +699,6 @@ class DatabaseTests(unittest.TestCase):
                         surname="Ivanov",
                         room_number=1234,
                         telegram_name="@dima",
-                        phone_number="+49123456789",
                         is_admin=False,
                     ),
                 ),
@@ -726,7 +718,6 @@ class DatabaseTests(unittest.TestCase):
                     1234,
                     name="Dima",
                     telegram_name="@dima",
-                    phone_number="+49123456789",
                 )
                 second_holder_id = create_gym_member_with_telegram_user_id(
                     connection,
@@ -735,7 +726,6 @@ class DatabaseTests(unittest.TestCase):
                     4321,
                     name="Alex",
                     telegram_name="@alex",
-                    phone_number="+49987654321",
                 )
                 first_key_id = create_key(connection, first_holder_id)
                 second_key_id = create_key(connection, second_holder_id)
@@ -753,7 +743,6 @@ class DatabaseTests(unittest.TestCase):
                             surname="Ivanov",
                             room_number=1234,
                             telegram_name="@dima",
-                            phone_number="+49123456789",
                             is_admin=False,
                         ),
                     ),
@@ -766,7 +755,6 @@ class DatabaseTests(unittest.TestCase):
                             surname="Petrov",
                             room_number=4321,
                             telegram_name="@alex",
-                            phone_number="+49987654321",
                             is_admin=False,
                         ),
                     ),
@@ -796,7 +784,6 @@ class DatabaseTests(unittest.TestCase):
                     1234,
                     name="Dima",
                     telegram_name="@dima",
-                    phone_number="+49123456789",
                 )
                 key_id = create_key(connection, holder_id)
 
@@ -816,7 +803,6 @@ class DatabaseTests(unittest.TestCase):
                         surname="Ivanov",
                         room_number=1234,
                         telegram_name="@dima",
-                        phone_number="+49123456789",
                         is_admin=False,
                     ),
                 ),
@@ -890,7 +876,6 @@ class DatabaseTests(unittest.TestCase):
                     1234,
                     name="Database Name",
                     telegram_name="telegram_name",
-                    phone_number="12345",
                 )
 
             member = get_gym_member_by_telegram_user_id(database_path, 123456)
@@ -899,7 +884,6 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual("Database Name Database Surname", member.full_name)
             self.assertEqual(1234, member.room_number)
             self.assertEqual("telegram_name", member.telegram_name)
-            self.assertEqual("12345", member.phone_number)
 
     def test_get_gym_member_records_filters_and_returns_member_fields(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -914,7 +898,6 @@ class DatabaseTests(unittest.TestCase):
                     1234,
                     name="Ada",
                     telegram_name="@ada",
-                    phone_number="+49123456789",
                 )
                 create_gym_member_with_telegram_user_id(
                     connection,
@@ -939,10 +922,9 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual("Lovelace", member.surname)
             self.assertEqual(1234, member.room_number)
             self.assertEqual("@ada", member.telegram_name)
-            self.assertEqual("+49123456789", member.phone_number)
             self.assertFalse(member.is_admin)
 
-    def test_add_gym_member_creates_member_with_optional_contact_data(self):
+    def test_add_gym_member_creates_member_with_required_telegram_name(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
@@ -954,31 +936,28 @@ class DatabaseTests(unittest.TestCase):
                 surname="Member",
                 room_number=1234,
                 telegram_name="@database_member",
-                phone_number="+49123456789",
             )
 
             self.assertEqual(123456, member.telegram_user_id)
             self.assertEqual("Database Member", member.full_name)
             self.assertEqual(1234, member.room_number)
             self.assertEqual("@database_member", member.telegram_name)
-            self.assertEqual("+49123456789", member.phone_number)
             self.assertFalse(member.is_admin)
 
-    def test_add_gym_member_allows_missing_optional_contact_data(self):
+    def test_add_gym_member_rejects_missing_telegram_name(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            member = add_gym_member(
-                database_path,
-                telegram_user_id=123456,
-                name="Database",
-                surname="Member",
-                room_number=1234,
-            )
-
-            self.assertIsNone(member.telegram_name)
-            self.assertIsNone(member.phone_number)
+            with self.assertRaisesRegex(ValueError, "telegram name is required"):
+                add_gym_member(
+                    database_path,
+                    telegram_user_id=123456,
+                    name="Database",
+                    surname="Member",
+                    room_number=1234,
+                    telegram_name="",
+                )
 
     def test_add_gym_member_rejects_duplicate_telegram_user_id(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -990,6 +969,7 @@ class DatabaseTests(unittest.TestCase):
                 name="First",
                 surname="Member",
                 room_number=1234,
+                telegram_name="@first",
             )
 
             with self.assertRaisesRegex(
@@ -1002,6 +982,7 @@ class DatabaseTests(unittest.TestCase):
                     name="Second",
                     surname="Member",
                     room_number=5678,
+                    telegram_name="@second",
                 )
 
     def test_update_gym_member_updates_only_supplied_fields(self):
@@ -1015,7 +996,6 @@ class DatabaseTests(unittest.TestCase):
                 surname="Surname",
                 room_number=1234,
                 telegram_name="@old",
-                phone_number="+49111",
             )
 
             member = update_gym_member(
@@ -1029,7 +1009,6 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual("Surname", member.surname)
             self.assertEqual(4321, member.room_number)
             self.assertEqual("@old", member.telegram_name)
-            self.assertEqual("+49111", member.phone_number)
 
     def test_update_gym_member_returns_none_when_member_is_missing(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1126,10 +1105,10 @@ class DatabaseTests(unittest.TestCase):
                 KeyStatus(
                     key_id=key_id,
                     current_holder=GymMember(
-                        holder_id, 200, "Current", "Holder", 5678, None, None, False
+                        holder_id, 200, "Current", "Holder", 5678, None, False
                     ),
                     owner=GymMember(
-                        owner_id, 100, "Key", "Mailbox", 1234, None, None, False
+                        owner_id, 100, "Key", "Mailbox", 1234, None, False
                     ),
                     is_active=False,
                 ),

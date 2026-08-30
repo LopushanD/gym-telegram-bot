@@ -26,7 +26,6 @@ class ReturnToMailboxTests(unittest.TestCase):
                     surname="Owner",
                     room_number=1234,
                     telegram_name=None,
-                    phone_number=None,
                     is_admin=False,
                 ),
             ),

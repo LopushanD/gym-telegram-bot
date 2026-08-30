@@ -9,12 +9,12 @@ Each command has `-h` or `--help` option, which will show detailed description a
 If you enter a command that requires at least one input with no inputs, you will get a message with a short usage hint\.
 \=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=
 
-`/adduser telegram_id name surname room [telegram_name] [phone_number]`
-Register a new gym member\. Telegram name and phone number are optional\.
+`/adduser telegram_id name surname room telegram_name`
+Register a new gym member\.
 
 `/updateuser telegram_id option value [option value ...]`
 Update specific gym member fields\. Options can be supplied in any order\.
-Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`, `-t` or `--telegram-name`, `-p` or `--phone-number`\.
+Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`, `-t` or `--telegram-name`\.
 
 `/givekey key_id telegram_id`
 Record that a registered gym member received a key\.

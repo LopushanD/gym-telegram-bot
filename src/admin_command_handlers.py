@@ -43,7 +43,7 @@ async def add_user_command_handler(update: Update, context) -> None:
         await reply_with_command_documentation(message, ADD_USER_ADMIN_COMMAND)
         return
 
-    if not 4 <= len(arguments) <= 6:
+    if len(arguments) != 5:
         await message.reply_text(messages.ADMIN_ADD_USER_USAGE_TEXT)
         return
 
@@ -58,8 +58,6 @@ async def add_user_command_handler(update: Update, context) -> None:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
 
-    telegram_name = arguments[4] if len(arguments) >= 5 else None
-    phone_number = arguments[5] if len(arguments) == 6 else None
     reply = None
     try:
         member = add_gym_member(
@@ -68,8 +66,7 @@ async def add_user_command_handler(update: Update, context) -> None:
             name=arguments[1],
             surname=arguments[2],
             room_number=room_number,
-            telegram_name=telegram_name,
-            phone_number=phone_number,
+            telegram_name=arguments[4],
         )
     except GymMemberAlreadyExistsError:
         reply = messages.ADMIN_ADD_USER_ALREADY_EXISTS_TEXT.format(

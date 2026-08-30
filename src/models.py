@@ -10,7 +10,6 @@ class GymMember:
     surname: str
     room_number: int
     telegram_name: str | None
-    phone_number: str | None
     is_admin: bool
 
     @property

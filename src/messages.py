@@ -52,13 +52,13 @@ ADMIN_GIVE_KEY_USAGE_TEXT = "Usage: /givekey key_id telegram_id"
 ADMIN_GIVE_KEY_USER_NOT_REGISTERED_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
 KEY_NOT_FOUND_TEXT = "Key {key_id} does not exist."
 ADMIN_GIVE_KEY_COMPLETED_TEXT = "Recorded: key {key_id} was given to {member} (Telegram ID {telegram_user_id})."
-ADMIN_ADD_USER_USAGE_TEXT = "Usage: /adduser telegram_id name surname room [telegram_name] [phone_number]"
+ADMIN_ADD_USER_USAGE_TEXT = "Usage: /adduser telegram_id name surname room telegram_name"
 ADMIN_ADD_USER_ALREADY_EXISTS_TEXT = "A gym member with Telegram ID {telegram_user_id} already exists."
 ADMIN_ADD_USER_COMPLETED_TEXT = "Added gym member {member} (Telegram ID {telegram_user_id}), room {room_number}."
 ADMIN_UPDATE_USER_USAGE_TEXT = (
     "Usage: /updateuser telegram_id option value [option value ...]\n"
     "Options: -n/--name, -s/--surname, -r/--room, "
-    "-t/--telegram-name, -p/--phone-number"
+    "-t/--telegram-name"
 )
 ADMIN_UPDATE_USER_NOT_FOUND_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
 ADMIN_UPDATE_USER_NO_CHANGES_TEXT = "No user data changed for Telegram ID {telegram_user_id}."
@@ -83,13 +83,13 @@ def current_key_holder_text(holder: KeyHolder) -> str:
         f"Key {holder.key_id} is currently held by {member.full_name}, "
         f"room {member.room_number}."
     )
-    if member.telegram_name:
+    if member.telegram_name is None:
+        telegram_name = "None"
+    else:
         telegram_name = member.telegram_name
         if not telegram_name.startswith("@"):
             telegram_name = f"@{telegram_name}"
-        text += f"\nTelegram: {telegram_name}"
-    if member.phone_number:
-        text += f"\nPhone: {member.phone_number}"
+    text += f"\nTelegram name: {telegram_name}"
     return text
 
 # TODO I think it's better to get rid of this function and make local
@@ -102,8 +102,7 @@ def gym_member_record_text(member: GymMember) -> str:
             f"Name: {member.name}",
             f"Surname: {member.surname}",
             f"Room: {member.room_number}",
-            f"Telegram name: {member.telegram_name or '-'}",
-            f"Phone number: {member.phone_number or '-'}",
+            f"Telegram name: {member.telegram_name or 'None'}",
             f"Admin: {'yes' if member.is_admin else 'no'}",
         )
     )

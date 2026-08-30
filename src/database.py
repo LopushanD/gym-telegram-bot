@@ -19,7 +19,6 @@ def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember
         surname=row["surname"],
         room_number=row["room_number"],
         telegram_name=row["telegram_name"],
-        phone_number=row["phone_number"],
         is_admin=bool(row["is_admin"]),
 ) if prefix is None else GymMember(
         id=row[f"{prefix}_member_id"],
@@ -28,7 +27,6 @@ def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember
         surname=row[f"{prefix}_surname"],
         room_number=row[f"{prefix}_room_number"],
         telegram_name=row[f"{prefix}_telegram_name"],
-        phone_number=row[f"{prefix}_phone_number"],
         is_admin=bool(row[f"{prefix}_is_admin"]),
     )
 
@@ -90,7 +88,6 @@ def initialize_database(database_path):
                 room_number INTEGER NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 telegram_name TEXT,
-                phone_number TEXT,
                 is_admin INTEGER NOT NULL DEFAULT 0
             )
             """
@@ -166,7 +163,6 @@ def get_key_owner_mailbox_info(database_path, key_id) -> GymMember | None:
             gm.surname,
             gm.room_number,
             gm.telegram_name,
-            gm.phone_number,
             gm.is_admin
         FROM keys
         JOIN gym_members gm
@@ -209,7 +205,6 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
             gym_members.surname,
             gym_members.room_number,
             gym_members.telegram_name,
-            gym_members.phone_number,
             gym_members.is_admin
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
@@ -267,7 +262,6 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
             gym_members.surname,
             gym_members.room_number,
             gym_members.telegram_name,
-            gym_members.phone_number,
             gym_members.is_admin
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
@@ -327,7 +321,6 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
             holder.surname AS holder_surname,
             holder.room_number AS holder_room_number,
             holder.telegram_name AS holder_telegram_name,
-            holder.phone_number AS holder_phone_number,
             holder.is_admin AS holder_is_admin,
             owner.id AS owner_member_id,
             owner.telegram_user_id AS owner_telegram_user_id,
@@ -335,7 +328,6 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
             owner.surname AS owner_surname,
             owner.room_number AS owner_room_number,
             owner.telegram_name AS owner_telegram_name,
-            owner.phone_number AS owner_phone_number,
             owner.is_admin AS owner_is_admin
         FROM keys
         JOIN gym_members holder ON holder.id = keys.current_holder_id
@@ -393,7 +385,6 @@ def get_key_history(
             members.surname,
             members.room_number,
             members.telegram_name,
-            members.phone_number,
             members.is_admin
         FROM key_holder_history history
         JOIN gym_members members ON members.id = history.holder_id
@@ -439,7 +430,6 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
                 surname,
                 room_number,
                 telegram_name,
-                phone_number,
                 is_admin
             FROM gym_members
             WHERE telegram_user_id = ?
@@ -463,7 +453,6 @@ def get_gym_member_records(database_path,name=None,surname=None,room_number=None
             surname,
             room_number,
             telegram_name,
-            phone_number,
             is_admin
         FROM gym_members
     """
@@ -501,8 +490,7 @@ def add_gym_member(
     name,
     surname,
     room_number,
-    telegram_name=None,
-    phone_number=None,
+    telegram_name,
 ) -> GymMember:
     """Create and return a gym member."""
     try:
@@ -515,10 +503,9 @@ def add_gym_member(
                     name,
                     surname,
                     room_number,
-                    telegram_name,
-                    phone_number
+                    telegram_name
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     telegram_user_id,
@@ -526,7 +513,6 @@ def add_gym_member(
                     surname,
                     room_number,
                     telegram_name,
-                    phone_number,
                 ),
             )
     except sqlite3.IntegrityError as error:
@@ -551,7 +537,6 @@ def update_gym_member(
     surname=None,
     room_number=None,
     telegram_name=None,
-    phone_number=None,
 ) -> GymMember | None:
     """Update supplied fields and return the gym member, or None if absent."""
     supplied_fields = {
@@ -559,7 +544,6 @@ def update_gym_member(
         "surname": surname,
         "room_number": room_number,
         "telegram_name": telegram_name,
-        "phone_number": phone_number,
     }
     changes = {
         field: value
@@ -621,10 +605,9 @@ def populate_members_table_with_mock_data(database_path,n_members,rng=None):
                     name,
                     surname,
                     room_number,
-                    telegram_name,
-                    phone_number
+                    telegram_name
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     telegram_user_id,
@@ -632,7 +615,6 @@ def populate_members_table_with_mock_data(database_path,n_members,rng=None):
                     rng.choice(SURNAMES),
                     rng.randint(1000, 9999),
                     f"@{name.lower()}{telegram_user_id % 10000}",
-                    f"+491{rng.randint(100000000, 999999999)}",
                 ),
             )
             inserted_member_ids.append(cursor.lastrowid)

@@ -1,15 +1,13 @@
 ---------- FIRST PRIORITY ----------
 -find where the bot could life (given that it might need to be updated/restarted)
+- make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
+        (At least take a look if it's an actual problem)
 ---------- SECOND PRIORITY ----------
-- look at admin commands that need an update to make them more convenient. Do not forget to update documentation afterwards.
-        * /adduser telegram_id name surname room [telegram_name] [phone_number] --> /adduser telegram_id name surname room telegram_name
-
 - remove redundant functions from database.py. Leave only the most general ones.
 - refactor commands code. Now it's redundant.
 - write technical documentation
 ---------- THIRD PRIORITY ----------
 - look at TODOs in the code.
-- make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
 - Add another Bot which will serve as a testing/learning ground for admins.
 - Reengineer the way handlers are stored
 
@@ -19,7 +17,7 @@
         * /mytelegramid # shows user telegram id (X)
         * /clear (X)
         * /users [-n or --name Value] [-s or --surname Value] [-n or --room Value] # information about all users for given query (X)
-        * /adduser telegram_id name surname room [telegram_name] [phone_number] (X)
+        * /adduser telegram_id name surname room telegram_name (X)
         * /keyhistory key_id [last n records] (X)
         * /updateuser telegram_id option value [option value ...] (X)
         * /keystatus key_id # full information about key status (current holder, owner, isActivated) (X)

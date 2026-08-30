@@ -21,7 +21,6 @@ class MessageTests(unittest.TestCase):
                 surname="Ivanov",
                 room_number=1234,
                 telegram_name="@dima",
-                phone_number="+49123456789",
                 is_admin=False,
             ),
         )
@@ -32,7 +31,7 @@ class MessageTests(unittest.TestCase):
         self.assertIn("Dima Ivanov", text)
         self.assertIn("room 1234", text)
         self.assertIn("Telegram: @dima", text)
-        self.assertIn("Phone: +49123456789", text)
+        self.assertNotIn("Phone:", text)
 
     def test_current_key_holder_text_skips_missing_contact_details(self):
         holder = KeyHolder(
@@ -44,7 +43,6 @@ class MessageTests(unittest.TestCase):
                 surname="Ivanov",
                 room_number=1234,
                 telegram_name=None,
-                phone_number=None,
                 is_admin=False,
             ),
         )
@@ -52,13 +50,12 @@ class MessageTests(unittest.TestCase):
         text = current_key_holder_text(holder)
 
         self.assertNotIn("Telegram:", text)
-        self.assertNotIn("Phone:", text)
 
     def test_key_history_record_text_describes_transfer(self):
         record = KeyHistoryRecord(
             event_id=5,
             key_id=2,
-            member=GymMember(10, 123, "Ada", "Lovelace", 1234, None, None, False),
+            member=GymMember(10, 123, "Ada", "Lovelace", 1234, None, False),
             taken_at=datetime(2026, 6, 5, 12, 30),
         )
 
@@ -71,10 +68,10 @@ class MessageTests(unittest.TestCase):
         status = KeyStatus(
             key_id=2,
             current_holder=GymMember(
-                10, 123, "Ada", "Lovelace", 1234, "@ada", "+49123", False
+                10, 123, "Ada", "Lovelace", 1234, "@ada", False
             ),
             owner=GymMember(
-                20, 456, "Key", "Mailbox", 4321, None, None, False
+                20, 456, "Key", "Mailbox", 4321, None, False
             ),
             is_active=False,
         )

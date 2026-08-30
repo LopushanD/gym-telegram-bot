@@ -2,7 +2,7 @@
 
 Lists registered gym members\.
 
-Use this to find member records and check details such as Telegram ID, room, Telegram username, phone number, and admin status\.
+Use this to find member records and check details such as Telegram ID, room, Telegram username, and admin status\.
 
 *Usage*
 

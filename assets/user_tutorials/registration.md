@@ -12,7 +12,6 @@ This is different from your Telegram username, such as @username\.
 \- Telegram username
 \- First and last name
 \- Room number
-\- Phone number \(optional\)
 >If you do not have a Telegram username:
 >1\. Open Telegram settings\.
 >2\. Go to _"Account"_\.

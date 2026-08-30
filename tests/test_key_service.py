@@ -29,7 +29,6 @@ class KeyServiceTests(unittest.TestCase):
             surname="Ivanov",
             room_number=1234,
             telegram_name="@dima",
-            phone_number="+49123456789",
             is_admin=False,
         )
 
@@ -46,7 +45,6 @@ class KeyServiceTests(unittest.TestCase):
                         surname="Ivanov",
                         room_number=1234,
                         telegram_name="@dima",
-                        phone_number="+49123456789",
                         is_admin=False,
                     ),
                 )
@@ -60,7 +58,6 @@ class KeyServiceTests(unittest.TestCase):
         self.assertEqual("Ivanov", holder.member.surname)
         self.assertEqual(1234, holder.member.room_number)
         self.assertEqual("@dima", holder.member.telegram_name)
-        self.assertEqual("+49123456789", holder.member.phone_number)
 
     def test_get_keyholders_returns_none_when_no_keys_exist(self):
         with patch("src.key_service.get_all_current_keyholders_info", return_value=[]):
@@ -110,7 +107,6 @@ class KeyServiceTests(unittest.TestCase):
                     surname="Ivanov",
                     room_number=1234,
                     telegram_name="@dima",
-                    phone_number="+49123456789",
                     is_admin=False,
                 ),
             ),

@@ -133,7 +133,6 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
                 surname="Owner",
                 room_number=1234,
                 telegram_name=None,
-                phone_number=None,
                 is_admin=False,
             ),
         ), patch.object(bot, "edit_to_start_state", new_callable=AsyncMock):
