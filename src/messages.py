@@ -1,4 +1,4 @@
-from src.config import HANDOVER_WINDOW_SECONDS
+from src.config import HANDOVER_WINDOW_SECONDS,TELEGRAM_CONTACT_NAME
 from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
 from src.user_commands import TUTORIALS_INFO_TUTORIAL
 
@@ -8,7 +8,7 @@ START_USER_MENU_TEXT = (
     "Welcome to the gym key tracking bot.\n\n"
     f"to get usage instructions, use /{TUTORIALS_INFO_TUTORIAL}. Read those, if you do not know, what to do. For available commands, use /help."
     "\n\nAdmins can use /commands to see all available commands for admins. \n\n"
-    "Found a bug or have a suggestion? Contact ***REMOVED***."
+    f"Found a bug or have a suggestion? Contact {TELEGRAM_CONTACT_NAME}."
 )
 USER_TUTORIAL_EMPTY_TEXT = "The tutorial is not available yet."
 USER_COMMAND_ADMINS_NOT_FOUND_TEXT = "There are currently no active gym AG members."

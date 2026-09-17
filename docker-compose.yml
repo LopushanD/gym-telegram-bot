@@ -4,7 +4,9 @@ services:
     environment:
       DATABASE_PATH: /app/data/gym_bot.sqlite3
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN before starting the bot}
+      TELEGRAM_CONTACT_NAME: ${TELEGRAM_CONTACT_NAME:? TELEGRAM_CONTACT_NAME environment variable wasn't provided}
     # For more convenient work with database during development.
+    #TODO check the optimal way of working with volumes for the database and tutorial assets
     volumes:
       - ./data:/app/data
       - ./assets:/app/assets

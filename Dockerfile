@@ -5,7 +5,6 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# COPY requirements.txt .
 RUN pip install "python-telegram-bot>=21.0,<22.0" --no-cache-dir
 
 COPY main.py .
