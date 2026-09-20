@@ -1,4 +1,6 @@
 ---------- FIRST PRIORITY ----------
+- expand admin commands to make it possible to work with database completely remotely.
+- look at data that is shown by /admins command. It needs to show only Name, room number, TG name. Remove TG id, Gym ID.
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
         (At least take a look if it's an actual problem)
 - think of better name instead of "Got key from member"
