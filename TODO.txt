@@ -1,11 +1,13 @@
 ---------- FIRST PRIORITY ----------
-- expand admin commands to make it possible to work with database completely remotely.
 - look at data that is shown by /admins command. It needs to show only Name, room number, TG name. Remove TG id, Gym ID.
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
         (At least take a look if it's an actual problem)
 - think of better name instead of "Got key from member"
 ---------- SECOND PRIORITY ----------
+- add a logger that will be able to export logs that are sent to docker terminal by telegram (needed for debugging purposes)
 - remove redundant functions from database.py. Leave only the most general ones.
+- commands that write to database should also be logged in a dedicated table.
+- make keyhistory logger more specific how key was obtained by a gym member.
 - now "return key to mailbox" return key to the key's owner. You might create dedicated table to mailbox or bind it to a person in any other way.
 - refactor commands code. Now it's redundant.
 - write technical documentation
