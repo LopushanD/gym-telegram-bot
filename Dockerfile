@@ -10,7 +10,7 @@ RUN mkdir -p /app/data
 COPY main.py .
 #remove during development/tests for more convenient access to assets
 #also look at volume for assets in the yml file
-COPY assets ./assets
+# COPY assets ./assets
 COPY src ./src
 
 CMD ["python", "main.py"]

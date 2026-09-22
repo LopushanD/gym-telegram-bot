@@ -258,7 +258,7 @@ async def key_status_command_handler(update: Update, context) -> None:
     if key_id <= 0:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
-
+    # TODO make key status message more readable
     status = get_key_status(DEFAULT_DATABASE_PATH, key_id)
     if status is None:
         await message.reply_text(
