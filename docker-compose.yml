@@ -11,11 +11,11 @@
 #       - ./data:/app/data
 #       # include during development/tests for more convenient access to assets
 #       # also look at COPY command in dockerfile
-#       # - ./assets:/app/assets
+#       - ./assets:/app/assets
 #     working_dir: /app
 #     restart: unless-stopped
 
-# FOR SERVER
+# #FOR SERVER
 services:
   gym-bot:
       # use prebuilt image from github

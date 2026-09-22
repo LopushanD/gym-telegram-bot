@@ -8,6 +8,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.admin_commands import (
     ACTIVATE_KEY_ADMIN_COMMAND,
     ADD_USER_ADMIN_COMMAND,
+    CHANGE_KEY_OWNER_ADMIN_COMMAND,
     DEACTIVATE_KEY_ADMIN_COMMAND,
     GIVE_KEY_ADMIN_COMMAND,
     SHOW_KEY_HISTORY_ADMIN_COMMAND,
@@ -22,6 +23,7 @@ class AdminCommandDocumentationTests(unittest.TestCase):
     def test_each_admin_command_has_command_specific_documentation(self):
         command_names = (
             ADD_USER_ADMIN_COMMAND,
+            CHANGE_KEY_OWNER_ADMIN_COMMAND,
             UPDATE_USER_ADMIN_COMMAND,
             GIVE_KEY_ADMIN_COMMAND,
             SHOW_USERS_ADMIN_COMMAND,

@@ -28,6 +28,9 @@ List recent _n_ holder changes for a key\. _n_ defaults to 5\.
 `/keystatus key_id`
 Show a key's current holder, owner, and active status\.
 
+`/keychangeowner key_id telegram_id`
+Change a key's owner\.
+
 `/activatekey key_id`
 Activate a key\.
 
