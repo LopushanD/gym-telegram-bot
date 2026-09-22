@@ -12,6 +12,7 @@ from src import messages
 from src.admin_commands import (
     ACTIVATE_KEY_ADMIN_COMMAND,
     ADD_USER_ADMIN_COMMAND,
+    CHANGE_KEY_OWNER_ADMIN_COMMAND,
     DEACTIVATE_KEY_ADMIN_COMMAND,
     GIVE_KEY_ADMIN_COMMAND,
     SHOW_KEY_HISTORY_ADMIN_COMMAND,
@@ -24,6 +25,7 @@ from src.admin_command_handlers import (
     UpdateUserUsageError,
     activate_key_command_handler,
     add_user_command_handler,
+    change_key_owner_command_handler,
     deactivate_key_command_handler,
     format_gym_member_changes,
     give_key_command_handler,
@@ -99,6 +101,11 @@ class AdminCommandHelpTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_all_admin_command_help_options_use_command_documentation(self):
         cases = (
+            (
+                CHANGE_KEY_OWNER_ADMIN_COMMAND,
+                change_key_owner_command_handler,
+                "src.admin_command_handlers.set_key_owner",
+            ),
             (
                 GIVE_KEY_ADMIN_COMMAND,
                 give_key_command_handler,

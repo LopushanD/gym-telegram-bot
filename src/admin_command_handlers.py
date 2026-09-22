@@ -11,6 +11,7 @@ from src.database import (
     get_key_history,
     get_key_status,
     set_key_active,
+    set_key_owner,
     update_gym_member,
 )
 from src.handover_flow import cancel_pending_handover
@@ -132,6 +133,50 @@ async def give_key_command_handler(update: Update, context) -> None:
     else:
         raise ValueError(f"unsupported give key status: {result.status}")
     await message.reply_text(reply)
+
+async def change_key_owner_command_handler(update: Update, context) -> None:
+    message = update.effective_message
+    if not await _user_is_admin(update):
+        return
+    arguments = getattr(context, "args", [])
+    if is_help_request(arguments):
+        await reply_with_command_documentation(message, CHANGE_KEY_OWNER_ADMIN_COMMAND)
+        return
+
+    if len(arguments) != 2:
+        await message.reply_text(messages.ADMIN_CHANGE_KEY_OWNER_USAGE_TEXT)
+        return
+
+    try:
+        key_id, telegram_user_id = (int(argument) for argument in arguments)
+    except ValueError:
+        await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
+        return
+    if key_id <= 0 or telegram_user_id <= 0:
+        await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
+        return
+
+    member = get_gym_member_by_telegram_user_id(DEFAULT_DATABASE_PATH, telegram_user_id)
+    if member is None:
+        await message.reply_text(
+            messages.ADMIN_CHANGE_KEY_OWNER_USER_NOT_REGISTERED_TEXT.format(
+                telegram_user_id=telegram_user_id,
+            )
+        )
+        return
+
+    if not set_key_owner(DEFAULT_DATABASE_PATH, key_id, member.id):
+        await message.reply_text(messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id))
+        return
+
+    await message.reply_text(
+        messages.ADMIN_CHANGE_KEY_OWNER_COMPLETED_TEXT.format(
+            key_id=key_id,
+            member=member.full_name,
+            telegram_user_id=telegram_user_id,
+        )
+    )
+
 
 async def update_user_command_handler(update: Update, context) -> None:
     message = update.effective_message

@@ -2,6 +2,7 @@ from pathlib import Path
 
 ALL_COMMANDS_ADMIN_COMMAND = "commands"
 GIVE_KEY_ADMIN_COMMAND = "givekey"
+CHANGE_KEY_OWNER_ADMIN_COMMAND = "keychangeowner"
 ADD_USER_ADMIN_COMMAND = "adduser"
 UPDATE_USER_ADMIN_COMMAND = "updateuser"
 SHOW_USERS_ADMIN_COMMAND = "users"
@@ -13,6 +14,7 @@ COMMAND_DOCS_ROOT = Path(__file__).resolve().parents[1] / "assets" / "admin_docs
 COMMAND_DOC_PATHS = {
     ALL_COMMANDS_ADMIN_COMMAND: COMMAND_DOCS_ROOT / "commands.md",
     GIVE_KEY_ADMIN_COMMAND: COMMAND_DOCS_ROOT / "givekey.md",
+    CHANGE_KEY_OWNER_ADMIN_COMMAND: COMMAND_DOCS_ROOT / "keychangeowner.md",
     ADD_USER_ADMIN_COMMAND: COMMAND_DOCS_ROOT / "adduser.md",
     UPDATE_USER_ADMIN_COMMAND: COMMAND_DOCS_ROOT / "updateuser.md",
     SHOW_USERS_ADMIN_COMMAND: COMMAND_DOCS_ROOT / "users.md",

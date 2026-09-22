@@ -349,6 +349,21 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
     )
 
 
+def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
+    """Set a key's owner and return whether the key exists."""
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        cursor = connection.execute(
+            """
+            UPDATE keys
+            SET owner_member_id = ?
+            WHERE id = ?
+            """,
+            (owner_member_id, key_id),
+        )
+    return cursor.rowcount > 0
+
+
 def set_key_active(database_path, key_id: int, do_activate: bool) -> bool:
     """Set a key's active status and return whether the key exists."""
     with sqlite3.connect(database_path) as connection:
