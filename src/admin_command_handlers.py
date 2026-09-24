@@ -303,7 +303,9 @@ async def key_status_command_handler(update: Update, context) -> None:
     if key_id <= 0:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
-    # TODO make key status message more readable
+    # TODO make key status message more readable. Add something like process_key_status_records
+    # even better is to try to make more abstract parent record processor and more specific
+    # processors as it's children
     status = get_key_status(DEFAULT_DATABASE_PATH, key_id)
     if status is None:
         await message.reply_text(

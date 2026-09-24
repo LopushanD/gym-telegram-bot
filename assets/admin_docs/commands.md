@@ -19,8 +19,9 @@ Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`, `-t`
 `/givekey key_id telegram_id`
 Record that a registered gym member received a key\.
 
-`/users [name] [surname] [room]`
+`/users telegram_id option value [option value ...]`
 List gym members matching the optional filters\.
+Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`\.
 
 `/keyhistory key_id [last_n_records]`
 List recent _n_ holder changes for a key\. _n_ defaults to 5\.

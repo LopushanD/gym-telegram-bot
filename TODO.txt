@@ -1,5 +1,8 @@
 ---------- FIRST PRIORITY ----------
 - look at data that is shown by /admins command. It needs to show only Name, room number, TG name. Remove TG id, Gym ID.
+- add /setadmin telegram_id True/False command that makes user admin or removes admin rights. One might need to be "superadmin"
+        to be able to execute it (think if it makes sense)
+-remove /clear command, until found how to make it work reliably.
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
         (At least take a look if it's an actual problem)
 - think of better name instead of "Got key from member"
