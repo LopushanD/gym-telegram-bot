@@ -25,7 +25,7 @@ def database_connection(database_path) -> Iterator[sqlite3.Connection]:
 class GymMemberAlreadyExistsError(ValueError):
     pass
 # TODO look at the 'prefix' parameter. It does not seem to be doing anything
-def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None,memberStatus:bool = False) -> GymMember:
+def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember:
     member = GymMember(
         id=row["member_id"] if prefix is None else row[f"{prefix}_member_id"],
         telegram_user_id=row["telegram_user_id"] if prefix is None else row[f"{prefix}_telegram_user_id"],
@@ -33,10 +33,9 @@ def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None,memberStatus:
         surname=row["surname"] if prefix is None else row[f"{prefix}_surname"],
         room_number=row["room_number"] if prefix is None else row[f"{prefix}_room_number"],
         telegram_name=row["telegram_name"] if prefix is None else row[f"{prefix}_telegram_name"],
-        is_admin=bool(row["is_admin"]) if prefix is None else bool(row[f"{prefix}_is_admin"]))
-    if memberStatus:
-        member.suspended_until=row["suspended_until"]if prefix is None else row[f"{prefix}_suspended_until"]
-        member.deleted_at=row["deleted_at"] if prefix is None else row[f"{prefix}_deleted_at"]
+        is_admin=bool(row["is_admin"]) if prefix is None else bool(row[f"{prefix}_is_admin"]),
+        suspended_until=row["suspended_until"]if prefix is None else row[f"{prefix}_suspended_until"],
+        deleted_at=row["deleted_at"] if prefix is None else row[f"{prefix}_deleted_at"])
     return member
 
 FIRST_NAMES = (
@@ -139,7 +138,7 @@ def initialize_database(database_path):
             )
             """
         )
-
+#TODO rewrite this function using general function that alters table based on query
 def change_key_holder(database_path, key_id, new_holder_id):
     """Change a key holder and append the change to holder history."""
     with database_connection(database_path) as connection:
@@ -369,7 +368,7 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
         is_active=bool(row["is_active"]),
     )
 
-
+#TODO rewrite this function using general function that alters table based on query
 def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
     """Set a key's owner and return whether the key exists."""
     with database_connection(database_path) as connection:
@@ -384,7 +383,7 @@ def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
         )
     return cursor.rowcount > 0
 
-
+#TODO rewrite this function using general function that alters table based on query
 def set_key_active(database_path, key_id: int, do_activate: bool) -> bool:
     """Set a key's active status and return whether the key exists."""
     with database_connection(database_path) as connection:
@@ -451,8 +450,7 @@ def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
     return member.id
 
 # TODO remove this function and replace it's usages by get_gym_member_records
-def get_gym_member_by_telegram_user_id(database_path,telegram_user_id,
-    fetchMemberStatus=False) -> GymMember | None:
+def get_gym_member_by_telegram_user_id(database_path,telegram_user_id) -> GymMember | None:
     """
     Deprecated. Use `get_gym_member_records` function instead.
     
@@ -481,10 +479,9 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id,
     if member is None:
         return None
 
-    return _gym_member_from_row(member,memberStatus=fetchMemberStatus)
+    return _gym_member_from_row(member)
 
-# TODO make possibility to query any field here. Make it primary member retrieval function
-def query_gym_member_records(database_path,querried_member:GymMember,fetchMemberStatus=False) -> list[GymMember]:
+def query_gym_member_records(database_path,querried_member:GymMember) -> list[GymMember]:
     """Return gym members matching the supplied filters."""
     query = """
         SELECT
@@ -501,20 +498,13 @@ def query_gym_member_records(database_path,querried_member:GymMember,fetchMember
     """
     conditions = []
     parameters = []
-    #TODO do not explicitly check certain parameters. Check which GymMember parameters are not None
-    # and set correspoding conditions and parameters based on it
-    if querried_member.name is not None:
-        conditions.append("name = ? COLLATE NOCASE")
-        parameters.append(querried_member.name)
-    if querried_member.surname is not None:
-        conditions.append("surname = ? COLLATE NOCASE")
-        parameters.append(querried_member.surname)
-    if querried_member.room_number is not None:
-        conditions.append("room_number = ?")
-        parameters.append(querried_member.room_number)
-    if querried_member.is_admin is not None:
-        conditions.append("is_admin = ?")
-        parameters.append(querried_member.is_admin)
+    for k,v in vars(querried_member).items():
+        if v is not None:
+            condition = f"{k} = ?"
+            if isinstance(v,str):
+                condition+=" COLLATE NOCASE"
+            conditions.append(condition)
+            parameters.append(v)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY surname COLLATE NOCASE, name COLLATE NOCASE, id"
@@ -524,7 +514,7 @@ def query_gym_member_records(database_path,querried_member:GymMember,fetchMember
         fetched_members = connection.execute(query, parameters).fetchall()
 
     return [
-        _gym_member_from_row(member,memberStatus=fetchMemberStatus)
+        _gym_member_from_row(member)
         for member in fetched_members
     ]
 
@@ -572,7 +562,16 @@ def add_gym_member(
         raise RuntimeError("created gym member could not be loaded")
     return member
 
+#TODO rewrite this function using general function that alters table based on query
+def set_admin(database_path, telegram_user_id: int, is_admin: bool) -> list[GymMember]:
+    """Set admin rights and return whether the member exists."""
+    with database_connection(database_path) as connection:
+        connection.execute(
+            "UPDATE gym_members SET is_admin = ? WHERE telegram_user_id = ?",
+            (int(is_admin), telegram_user_id))
+    return query_gym_member_records(database_path,GymMember(telegram_user_id=telegram_user_id))
 
+#TODO rewrite this function using general function that alters table based on query
 def update_gym_member(
     database_path,
     telegram_user_id,
