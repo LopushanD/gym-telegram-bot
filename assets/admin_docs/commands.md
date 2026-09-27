@@ -16,7 +16,7 @@ Register a new gym member\.
 Update specific gym member fields\. Options can be supplied in any order\.
 Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`, `-t` or `--telegram-name`\.
 
-`/users telegram_id option value [option value ...]`
+`/users option value [option value ...]`
 List gym members matching the optional filters\.
 Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`\.
 
