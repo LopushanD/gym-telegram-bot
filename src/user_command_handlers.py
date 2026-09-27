@@ -53,7 +53,8 @@ async def show_admins_command_handler(update: Update, context:ContextTypes.DEFAU
     message = update.effective_message
     members = get_gym_member_records(DEFAULT_DATABASE_PATH,is_admin=True)
     if members:
-        for reply in process_gym_member_records(members, "\n"+"-"*10+"\n"):
+        separator = "\n"+"-"*10+"\n"
+        for reply in process_gym_member_records(members,separator,showTechnicalIDs=False):
             await message.reply_text(reply)
     else:
         await message.reply_text(messages.USER_COMMAND_ADMINS_NOT_FOUND_TEXT)

@@ -242,7 +242,8 @@ async def users_command_handler(update: Update, context) -> None:
             surname=gym_member_dict["surname"],
             room_number=gym_member_dict["room_number"])
         if members:
-            for reply in process_gym_member_records(members, "\n"+"-"*10+"\n"):
+            separator = "\n"+"-"*10+"\n"
+            for reply in process_gym_member_records(members,separator,showTechnicalIDs=True):
                 await message.reply_text(reply)
         else:
             await message.reply_text(messages.ADMIN_USERS_NOT_FOUND_TEXT)
