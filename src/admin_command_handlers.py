@@ -12,6 +12,7 @@ from src.database import (
     get_key_status,
     set_key_active,
     set_key_owner,
+    set_admin,
     update_gym_member,
 )
 from src.handover_flow import cancel_pending_handover
@@ -35,6 +36,39 @@ async def _user_is_admin(update:Update)->bool:
         await message.reply_text(messages.ADMIN_COMMAND_FORBIDDEN_TEXT)
         return False
     return True
+
+async def set_admin_command_handler(update: Update, context) -> None:
+    message = update.effective_message
+    if not await _user_is_admin(update):
+        return
+    arguments = getattr(context, "args", [])
+    if is_help_request(arguments):
+        await reply_with_command_documentation(message, SET_ADMIN_ADMIN_COMMAND)
+        return
+    if len(arguments) != 2:
+        await message.reply_text(messages.ADMIN_SET_ADMIN_USAGE_TEXT)
+        return
+    try:
+        telegram_user_id = int(arguments[0])
+    except ValueError:
+        await message.reply_text(messages.ADMIN_SET_ADMIN_BAD_VALUE_TEXT)
+        return
+    admin_set_value = arguments[1].lower()
+    if telegram_user_id <= 0 or admin_set_value not in ("true", "false"):
+        await message.reply_text(messages.ADMIN_SET_ADMIN_BAD_VALUE_TEXT)
+        return
+    admin_set_value = admin_set_value == "true" #transform value to boolean
+    members = set_admin(DEFAULT_DATABASE_PATH, telegram_user_id, admin_set_value)
+    if not members: # there can be 0 or 1 user with given telegram ID
+        await message.reply_text(
+            messages.ADMIN_SET_ADMIN_NOT_FOUND_TEXT.format(telegram_user_id=telegram_user_id)
+        )
+        return
+    await message.reply_text(
+        messages.ADMIN_SET_ADMIN_COMPLETED_TEXT.format(
+            member = process_gym_member_records(members,"",showAdminStatus=True)[0]
+        )
+    )
 
 async def add_user_command_handler(update: Update, context) -> None:
     message = update.effective_message
@@ -240,11 +274,10 @@ async def users_command_handler(update: Update, context) -> None:
             DEFAULT_DATABASE_PATH,
             GymMember(name=gym_member_dict["name"],
             surname=gym_member_dict["surname"],
-            room_number=gym_member_dict["room_number"]),
-            fetchMemberStatus=True)
+            room_number=gym_member_dict["room_number"]))
         if members:
             separator = "\n"+"-"*10+"\n"
-            for reply in process_gym_member_records(members,separator,showTechnicalIDs=True,showMemberStatus=True):
+            for reply in process_gym_member_records(members,separator,showTechnicalIDs=True,showMemberStatus=True,showAdminStatus=True):
                 await message.reply_text(reply)
         else:
             await message.reply_text(messages.ADMIN_USERS_NOT_FOUND_TEXT)

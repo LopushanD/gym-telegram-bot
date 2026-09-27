@@ -304,6 +304,7 @@ def main() -> None:
     application.add_handler(CommandHandler(CHANGE_KEY_OWNER_ADMIN_COMMAND, change_key_owner_command_handler))
     application.add_handler(CommandHandler(ADD_USER_ADMIN_COMMAND, add_user_command_handler))
     application.add_handler(CommandHandler(UPDATE_USER_ADMIN_COMMAND, update_user_command_handler))
+    application.add_handler(CommandHandler(SET_ADMIN_ADMIN_COMMAND, set_admin_command_handler))
     application.add_handler(CommandHandler(SHOW_USERS_ADMIN_COMMAND, users_command_handler))
     application.add_handler(CommandHandler(SHOW_KEY_HISTORY_ADMIN_COMMAND, key_history_command_handler))
     application.add_handler(CommandHandler(SHOW_KEY_STATUS_ADMIN_COMMAND, key_status_command_handler))
