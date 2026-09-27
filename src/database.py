@@ -183,7 +183,9 @@ def get_key_owner_mailbox_info(database_path, key_id) -> GymMember | None:
             gm.surname,
             gm.room_number,
             gm.telegram_name,
-            gm.is_admin
+            gm.is_admin,
+            gm.suspended_until,
+            gm.deleted_at
         FROM keys
         JOIN gym_members gm
             ON keys.owner_member_id = gm.id
@@ -225,7 +227,9 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
             gym_members.surname,
             gym_members.room_number,
             gym_members.telegram_name,
-            gym_members.is_admin
+            gym_members.is_admin,
+            gym_members.suspended_until,
+            gym_members.deleted_at
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
         WHERE keys.id = ?
@@ -282,7 +286,9 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
             gym_members.surname,
             gym_members.room_number,
             gym_members.telegram_name,
-            gym_members.is_admin
+            gym_members.is_admin,
+            gym_members.suspended_until,
+            gym_members.deleted_at
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
     """
@@ -342,13 +348,17 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
             holder.room_number AS holder_room_number,
             holder.telegram_name AS holder_telegram_name,
             holder.is_admin AS holder_is_admin,
+            holder.suspended_until AS holder_suspended_until,
+            holder.deleted_at AS holder_deleted_at,
             owner.id AS owner_member_id,
             owner.telegram_user_id AS owner_telegram_user_id,
             owner.name AS owner_name,
             owner.surname AS owner_surname,
             owner.room_number AS owner_room_number,
             owner.telegram_name AS owner_telegram_name,
-            owner.is_admin AS owner_is_admin
+            owner.is_admin AS owner_is_admin,
+            owner.suspended_until AS owner_suspended_until,
+            owner.deleted_at AS owner_deleted_at
         FROM keys
         JOIN gym_members holder ON holder.id = keys.current_holder_id
         JOIN gym_members owner ON owner.id = keys.owner_member_id
@@ -420,7 +430,9 @@ def get_key_history(
             members.surname,
             members.room_number,
             members.telegram_name,
-            members.is_admin
+            members.is_admin,
+            members.suspended_until,
+            members.deleted_at
         FROM key_holder_history history
         JOIN gym_members members ON members.id = history.holder_id
         WHERE history.key_id = ?
