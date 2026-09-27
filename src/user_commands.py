@@ -6,27 +6,28 @@ GIVE_KEY_TUTORIAL = "givekeytutorial"
 RETURN_KEY_TUTORIAL = "returnkeytutorial"
 
 HELP_USER_COMMAND = "help"
-CLEAR_USER_COMMAND = "clear"
-GET_TG_ID_USER_COMMAND = "mytelegramid"
+
+# CLEAR_USER_COMMAND = "clear"
+# CLEAR_USER_COMMAND_TEXT = """ Delete all messages and get starting message and buttons\.
+# In some cases Telegram does not allow to delete messages\.
+# In this case use _'clear history'_ in your chat settings\."""
+
+GET_TELEGRAM_ID_USER_COMMAND = "mytelegramid"
 START_USER_COMMAND = "start"
 SHOW_ADMINS_USER_COMMAND = "admins"
 HELP_TEXT = f"""Available commands:
 
-/mytelegramid
-Shows your Telegram user ID\.
-
-/clear
-Delete all messages and get starting message and buttons\. In some cases Telegram does not allow to delete messages\.
-In this case use _'clear history'_ in your chat settings\.
+/{START_USER_COMMAND}
+Get starting message and buttons\.
 
 /{TUTORIALS_INFO_TUTORIAL}
 Shows all available tutorials\.
 
-/start
-Get starting message and buttons\.
-
-/admins
+/{SHOW_ADMINS_USER_COMMAND}
 Shows list of all bot admins\.
+
+/{GET_TELEGRAM_ID_USER_COMMAND}
+Shows your Telegram user ID\.
 """
 
 TURORIALS_ROOT = Path(__file__).resolve().parents[1] / "assets" / "user_tutorials"

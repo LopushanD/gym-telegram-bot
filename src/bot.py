@@ -295,9 +295,9 @@ def main() -> None:
     
     application.add_handler(CommandHandler(HELP_USER_COMMAND, help_command_handler))
     application.add_handler(CommandHandler(START_USER_COMMAND, start_state_command_handler))
-    application.add_handler(CommandHandler(GET_TG_ID_USER_COMMAND, my_telegram_id_command_handler))
-    application.add_handler(CommandHandler(CLEAR_USER_COMMAND, clear_command_handler))
+    application.add_handler(CommandHandler(GET_TELEGRAM_ID_USER_COMMAND, my_telegram_id_command_handler))
     application.add_handler(CommandHandler(SHOW_ADMINS_USER_COMMAND, show_admins_command_handler))
+    # application.add_handler(CommandHandler(CLEAR_USER_COMMAND, clear_command_handler))
     
     application.add_handler(CommandHandler(ALL_COMMANDS_ADMIN_COMMAND, get_all_commands_handler))
     application.add_handler(CommandHandler(GIVE_KEY_ADMIN_COMMAND, give_key_command_handler))
