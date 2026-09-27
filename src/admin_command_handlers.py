@@ -7,7 +7,7 @@ from src.database import (
     GymMemberAlreadyExistsError,
     add_gym_member,
     get_gym_member_by_telegram_user_id,
-    get_gym_member_records,
+    query_gym_member_records,
     get_key_history,
     get_key_status,
     set_key_active,
@@ -236,14 +236,15 @@ async def users_command_handler(update: Update, context) -> None:
     
     try:
         gym_member_dict = parse_user_command_arguments(arguments)
-        members = get_gym_member_records(
+        members = query_gym_member_records(
             DEFAULT_DATABASE_PATH,
-            name=gym_member_dict["name"],
+            GymMember(name=gym_member_dict["name"],
             surname=gym_member_dict["surname"],
-            room_number=gym_member_dict["room_number"])
+            room_number=gym_member_dict["room_number"]),
+            fetchMemberStatus=True)
         if members:
             separator = "\n"+"-"*10+"\n"
-            for reply in process_gym_member_records(members,separator,showTechnicalIDs=True):
+            for reply in process_gym_member_records(members,separator,showTechnicalIDs=True,showMemberStatus=True):
                 await message.reply_text(reply)
         else:
             await message.reply_text(messages.ADMIN_USERS_NOT_FOUND_TEXT)

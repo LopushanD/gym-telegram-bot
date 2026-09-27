@@ -11,25 +11,20 @@ from src.config import DEFAULT_DATABASE_PATH
 
 class GymMemberAlreadyExistsError(ValueError):
     pass
-def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember:
-    return GymMember(
-        id=row["member_id"],
-        telegram_user_id=row["telegram_user_id"],
-        name=row["name"],
-        surname=row["surname"],
-        room_number=row["room_number"],
-        telegram_name=row["telegram_name"],
-        is_admin=bool(row["is_admin"]),
-) if prefix is None else GymMember(
-        id=row[f"{prefix}_member_id"],
-        telegram_user_id=row[f"{prefix}_telegram_user_id"],
-        name=row[f"{prefix}_name"],
-        surname=row[f"{prefix}_surname"],
-        room_number=row[f"{prefix}_room_number"],
-        telegram_name=row[f"{prefix}_telegram_name"],
-        is_admin=bool(row[f"{prefix}_is_admin"]),
-    )
-
+# TODO look at the 'prefix' parameter. It does not seem to be doing anything
+def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None,memberStatus:bool = False) -> GymMember:
+    member = GymMember(
+        id=row["member_id"] if prefix is None else row[f"{prefix}_member_id"],
+        telegram_user_id=row["telegram_user_id"] if prefix is None else row[f"{prefix}_telegram_user_id"],
+        name=row["name"] if prefix is None else row[f"{prefix}_name"],
+        surname=row["surname"] if prefix is None else row[f"{prefix}_surname"],
+        room_number=row["room_number"] if prefix is None else row[f"{prefix}_room_number"],
+        telegram_name=row["telegram_name"] if prefix is None else row[f"{prefix}_telegram_name"],
+        is_admin=bool(row["is_admin"]) if prefix is None else bool(row[f"{prefix}_is_admin"]))
+    if memberStatus:
+        member.suspended_until=row["suspended_until"]if prefix is None else row[f"{prefix}_suspended_until"]
+        member.deleted_at=row["deleted_at"] if prefix is None else row[f"{prefix}_deleted_at"]
+    return member
 
 FIRST_NAMES = (
     "Alex",
@@ -88,10 +83,23 @@ def initialize_database(database_path):
                 room_number INTEGER NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 telegram_name TEXT,
-                is_admin INTEGER NOT NULL DEFAULT 0
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                deleted_at TIMESTAMP DEFAULT NULL,
+                suspended_until TIMESTAMP DEFAULT NULL
             )
             """
         )
+        ###########################
+        #TODO remove that code later. Needed to alter existing table
+        member_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(gym_members)")
+        }
+        for column_name in ("deleted_at", "suspended_until"):
+            if column_name not in member_columns:
+                connection.execute(
+                    f"ALTER TABLE gym_members ADD COLUMN {column_name} TIMESTAMP DEFAULT NULL"
+                )
+        ###########################
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS keys (
@@ -429,10 +437,13 @@ def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
         return None
     return member.id
 
-
-def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
-                                       ) -> GymMember | None:
-    """Return the registered gym member for a Telegram user, or None if absent."""
+# TODO remove this function and replace it's usages by get_gym_member_records
+def get_gym_member_by_telegram_user_id(database_path,telegram_user_id,
+    fetchMemberStatus=False) -> GymMember | None:
+    """
+    Deprecated. Use `get_gym_member_records` function instead.
+    
+    Return the registered gym member for a Telegram user, or None if absent."""
     with sqlite3.connect(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.row_factory = sqlite3.Row
@@ -445,7 +456,9 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
                 surname,
                 room_number,
                 telegram_name,
-                is_admin
+                is_admin,
+                suspended_until,
+                deleted_at
             FROM gym_members
             WHERE telegram_user_id = ?
             """,
@@ -455,10 +468,10 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
     if member is None:
         return None
 
-    return _gym_member_from_row(member)
+    return _gym_member_from_row(member,memberStatus=fetchMemberStatus)
 
 # TODO make possibility to query any field here. Make it primary member retrieval function
-def get_gym_member_records(database_path,name=None,surname=None,room_number=None,is_admin=None) -> list[GymMember]:
+def query_gym_member_records(database_path,querried_member:GymMember,fetchMemberStatus=False) -> list[GymMember]:
     """Return gym members matching the supplied filters."""
     query = """
         SELECT
@@ -468,35 +481,38 @@ def get_gym_member_records(database_path,name=None,surname=None,room_number=None
             surname,
             room_number,
             telegram_name,
-            is_admin
+            is_admin,
+            suspended_until,
+            deleted_at
         FROM gym_members
     """
     conditions = []
     parameters = []
-
-    if name is not None:
+    #TODO do not explicitly check certain parameters. Check which GymMember parameters are not None
+    # and set correspoding conditions and parameters based on it
+    if querried_member.name is not None:
         conditions.append("name = ? COLLATE NOCASE")
-        parameters.append(name)
-    if surname is not None:
+        parameters.append(querried_member.name)
+    if querried_member.surname is not None:
         conditions.append("surname = ? COLLATE NOCASE")
-        parameters.append(surname)
-    if room_number is not None:
+        parameters.append(querried_member.surname)
+    if querried_member.room_number is not None:
         conditions.append("room_number = ?")
-        parameters.append(room_number)
-    if is_admin is not None:
+        parameters.append(querried_member.room_number)
+    if querried_member.is_admin is not None:
         conditions.append("is_admin = ?")
-        parameters.append(is_admin)
+        parameters.append(querried_member.is_admin)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY surname COLLATE NOCASE, name COLLATE NOCASE, id"
 
     with sqlite3.connect(database_path) as connection:
         connection.row_factory = sqlite3.Row
-        members = connection.execute(query, parameters).fetchall()
+        fetched_members = connection.execute(query, parameters).fetchall()
 
     return [
-        _gym_member_from_row(member)
-        for member in members
+        _gym_member_from_row(member,memberStatus=fetchMemberStatus)
+        for member in fetched_members
     ]
 
 def add_gym_member(

@@ -28,7 +28,7 @@ def _split_record_texts(record_texts: list[str], separator: str) -> list[str]:
             replies.append(record_text)
     return replies
 
-def process_gym_member_records(members: list[GymMember], separator: str,showTechnicalIDs: bool = False) -> list[str]:
+def process_gym_member_records(members: list[GymMember], separator: str,showTechnicalIDs: bool = False, showMemberStatus:bool = False) -> list[str]:
     replies = []
     records = []
     for member in members:
@@ -40,6 +40,10 @@ def process_gym_member_records(members: list[GymMember], separator: str,showTech
             record = "\n".join([record,
             "Telegram ID: "+str(member.telegram_user_id),
             "Gym member ID: "+str(member.id)])
+        if showMemberStatus:
+            record = "\n".join([record,
+            "Suspended until: "+member.suspended_until if member.suspended_until is not None else "Suspended until: None",
+            "Deleted at: "+member.deleted_at if member.deleted_at is not None else "Deleted at: None"])
         records.append(record)
     replies = _split_record_texts(records,separator)
     return replies
