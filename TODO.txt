@@ -13,6 +13,6 @@
 - write technical documentation
 ---------- THIRD PRIORITY ----------
 - look at TODOs in the code.
-- add names to keys in database
+- remove outdated or garbage generated tests
 - Add another Bot which will serve as a testing/learning ground for admins.
 - Reengineer the way handlers are stored
