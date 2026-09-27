@@ -1,11 +1,11 @@
 ---------- FIRST PRIORITY ----------
-- add /deleteuser admin command. 
 - add /setadmin telegram_id True/False command that makes user admin or removes admin rights. One might need to be "superadmin"
         to be able to execute it (think if it makes sense)
 - make it impossible for not registered users to read data (see information) (now they just cannot write it)
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
         (At least take a look if it's an actual problem)
 ---------- SECOND PRIORITY ----------
+- add /deleteuser admin command. It sets deleted_at column to currect timestamp (if the column is not NULL, it means user was deleted)
 - add a logger that will be able to export logs that are sent to docker terminal by telegram (needed for debugging purposes)
 - remove redundant functions from database.py. Leave only the most general ones.
 - commands that write to database should also be logged in a dedicated table.

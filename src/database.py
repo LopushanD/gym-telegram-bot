@@ -1,12 +1,25 @@
 import random
 import sqlite3
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
 from src.config import DEFAULT_DATABASE_PATH
+
+
+@contextmanager
+def database_connection(database_path) -> Iterator[sqlite3.Connection]:
+    """Commit or roll back the transaction, then always close the connection."""
+    connection = sqlite3.connect(database_path)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 class GymMemberAlreadyExistsError(ValueError):
@@ -71,7 +84,7 @@ TEST_MAILBOXES = (
 
 def initialize_database(database_path):
     """Create the application database tables if they do not exist yet."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(
             """
@@ -129,7 +142,7 @@ def initialize_database(database_path):
 
 def change_key_holder(database_path, key_id, new_holder_id):
     """Change a key holder and append the change to holder history."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
 
         holder_exists = connection.execute(
@@ -177,7 +190,7 @@ def get_key_owner_mailbox_info(database_path, key_id) -> GymMember | None:
             ON keys.owner_member_id = gm.id
         WHERE keys.id = ?
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
         owner = connection.execute(query, [key_id]).fetchone()
 
@@ -198,7 +211,7 @@ def get_key_return_instruction_info(database_path, telegram_user_id):
         ORDER BY keys.id
         LIMIT 1
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         return connection.execute(query, [telegram_user_id]).fetchone()
 #TODO use KeyHistoryRecord here, KeyHolder is just its subset
 def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_member_id=None
@@ -228,7 +241,7 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
         query += " AND gym_members.id = ?"
         parameters.append(gym_member_id)
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.row_factory = sqlite3.Row
         holder = connection.execute(query, parameters).fetchone()
@@ -251,7 +264,7 @@ def get_key_id_by_telegram_user_id(database_path, telegram_user_id):
             ON keys.current_holder_id = gym_members.id
         WHERE gym_members.telegram_user_id = ?
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         key = connection.execute(query, [telegram_user_id]).fetchone()
     if key is None:
@@ -290,7 +303,7 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
 
     query += " ORDER BY keys.id"
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.row_factory = sqlite3.Row
         holders = connection.execute(query, parameters).fetchall()
@@ -306,7 +319,7 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
 
 def get_key_count(database_path):
     """Return the number of tracked keys."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         row = connection.execute(
             """
@@ -342,7 +355,7 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
         JOIN gym_members owner ON owner.id = keys.owner_member_id
         WHERE keys.id = ?
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
         row = connection.execute(query, (key_id,)).fetchone()
 
@@ -359,7 +372,7 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
 
 def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
     """Set a key's owner and return whether the key exists."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         cursor = connection.execute(
             """
@@ -374,7 +387,7 @@ def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
 
 def set_key_active(database_path, key_id: int, do_activate: bool) -> bool:
     """Set a key's active status and return whether the key exists."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         cursor = connection.execute(
             """
             UPDATE keys
@@ -416,7 +429,7 @@ def get_key_history(
         LIMIT ?
     """
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
         records = connection.execute(query, (key_id, limit)).fetchall()
 
@@ -444,7 +457,7 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id,
     Deprecated. Use `get_gym_member_records` function instead.
     
     Return the registered gym member for a Telegram user, or None if absent."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.row_factory = sqlite3.Row
         member = connection.execute(
@@ -506,7 +519,7 @@ def query_gym_member_records(database_path,querried_member:GymMember,fetchMember
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY surname COLLATE NOCASE, name COLLATE NOCASE, id"
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
         fetched_members = connection.execute(query, parameters).fetchall()
 
@@ -525,7 +538,7 @@ def add_gym_member(
 ) -> GymMember:
     """Create and return a gym member."""
     try:
-        with sqlite3.connect(database_path) as connection:
+        with database_connection(database_path) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute(
                 """
@@ -586,7 +599,7 @@ def update_gym_member(
 
     assignments = ", ".join(f"{field} = ?" for field in changes)
     parameters = [*changes.values(), telegram_user_id]
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute(
             f"""
             UPDATE gym_members
@@ -608,7 +621,7 @@ def populate_members_table_with_mock_data(database_path,n_members,rng=None):
     inserted_member_ids = []
     used_telegram_user_ids = set()
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
 
         existing_telegram_user_ids = {
@@ -658,7 +671,7 @@ def populate_test_mailboxes_and_keys(database_path):
     mailbox_member_ids = []
     key_ids = []
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
 
         for mailbox in TEST_MAILBOXES:
