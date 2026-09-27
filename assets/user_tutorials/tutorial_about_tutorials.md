@@ -14,4 +14,4 @@ How to hand your key over to another member\.
 /returnkeytutorial
 How to return your key to a mailbox\.
 
-Press on /clear to delete all messages and get starting message and buttons\.
+Press on /start to get the starting message and buttons\.

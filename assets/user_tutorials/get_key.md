@@ -34,4 +34,4 @@ Once confirmed, you are responsible for the key until you hand it to another mem
 
 Press on /tutorials to return to the list of tutorials\.
 
-Press on /clear to delete all messages and get starting message and buttons\.
+Press on /start to get the starting message and buttons\.
