@@ -1,6 +1,8 @@
 import random
 import sqlite3
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime
 if __package__ is None or __package__ == "":
@@ -9,27 +11,32 @@ from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
 from src.config import DEFAULT_DATABASE_PATH
 
 
+@contextmanager
+def database_connection(database_path) -> Iterator[sqlite3.Connection]:
+    """Commit or roll back the transaction, then always close the connection."""
+    connection = sqlite3.connect(database_path)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
+
 class GymMemberAlreadyExistsError(ValueError):
     pass
+# TODO look at the 'prefix' parameter. It does not seem to be doing anything
 def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember:
-    return GymMember(
-        id=row["member_id"],
-        telegram_user_id=row["telegram_user_id"],
-        name=row["name"],
-        surname=row["surname"],
-        room_number=row["room_number"],
-        telegram_name=row["telegram_name"],
-        is_admin=bool(row["is_admin"]),
-) if prefix is None else GymMember(
-        id=row[f"{prefix}_member_id"],
-        telegram_user_id=row[f"{prefix}_telegram_user_id"],
-        name=row[f"{prefix}_name"],
-        surname=row[f"{prefix}_surname"],
-        room_number=row[f"{prefix}_room_number"],
-        telegram_name=row[f"{prefix}_telegram_name"],
-        is_admin=bool(row[f"{prefix}_is_admin"]),
-    )
-
+    member = GymMember(
+        id=row["member_id"] if prefix is None else row[f"{prefix}_member_id"],
+        telegram_user_id=row["telegram_user_id"] if prefix is None else row[f"{prefix}_telegram_user_id"],
+        name=row["name"] if prefix is None else row[f"{prefix}_name"],
+        surname=row["surname"] if prefix is None else row[f"{prefix}_surname"],
+        room_number=row["room_number"] if prefix is None else row[f"{prefix}_room_number"],
+        telegram_name=row["telegram_name"] if prefix is None else row[f"{prefix}_telegram_name"],
+        is_admin=bool(row["is_admin"]) if prefix is None else bool(row[f"{prefix}_is_admin"]),
+        suspended_until=row["suspended_until"]if prefix is None else row[f"{prefix}_suspended_until"],
+        deleted_at=row["deleted_at"] if prefix is None else row[f"{prefix}_deleted_at"])
+    return member
 
 FIRST_NAMES = (
     "Alex",
@@ -76,7 +83,7 @@ TEST_MAILBOXES = (
 
 def initialize_database(database_path):
     """Create the application database tables if they do not exist yet."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(
             """
@@ -88,10 +95,23 @@ def initialize_database(database_path):
                 room_number INTEGER NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 telegram_name TEXT,
-                is_admin INTEGER NOT NULL DEFAULT 0
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                deleted_at TIMESTAMP DEFAULT NULL,
+                suspended_until TIMESTAMP DEFAULT NULL
             )
             """
         )
+        ###########################
+        #TODO remove that code later. Needed to alter existing table
+        member_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(gym_members)")
+        }
+        for column_name in ("deleted_at", "suspended_until"):
+            if column_name not in member_columns:
+                connection.execute(
+                    f"ALTER TABLE gym_members ADD COLUMN {column_name} TIMESTAMP DEFAULT NULL"
+                )
+        ###########################
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS keys (
@@ -118,10 +138,10 @@ def initialize_database(database_path):
             )
             """
         )
-
+#TODO rewrite this function using general function that alters table based on query
 def change_key_holder(database_path, key_id, new_holder_id):
     """Change a key holder and append the change to holder history."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
 
         holder_exists = connection.execute(
@@ -163,13 +183,15 @@ def get_key_owner_mailbox_info(database_path, key_id) -> GymMember | None:
             gm.surname,
             gm.room_number,
             gm.telegram_name,
-            gm.is_admin
+            gm.is_admin,
+            gm.suspended_until,
+            gm.deleted_at
         FROM keys
         JOIN gym_members gm
             ON keys.owner_member_id = gm.id
         WHERE keys.id = ?
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
         owner = connection.execute(query, [key_id]).fetchone()
 
@@ -190,7 +212,7 @@ def get_key_return_instruction_info(database_path, telegram_user_id):
         ORDER BY keys.id
         LIMIT 1
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         return connection.execute(query, [telegram_user_id]).fetchone()
 #TODO use KeyHistoryRecord here, KeyHolder is just its subset
 def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_member_id=None
@@ -205,7 +227,9 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
             gym_members.surname,
             gym_members.room_number,
             gym_members.telegram_name,
-            gym_members.is_admin
+            gym_members.is_admin,
+            gym_members.suspended_until,
+            gym_members.deleted_at
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
         WHERE keys.id = ?
@@ -220,7 +244,7 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
         query += " AND gym_members.id = ?"
         parameters.append(gym_member_id)
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.row_factory = sqlite3.Row
         holder = connection.execute(query, parameters).fetchone()
@@ -243,7 +267,7 @@ def get_key_id_by_telegram_user_id(database_path, telegram_user_id):
             ON keys.current_holder_id = gym_members.id
         WHERE gym_members.telegram_user_id = ?
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         key = connection.execute(query, [telegram_user_id]).fetchone()
     if key is None:
@@ -262,7 +286,9 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
             gym_members.surname,
             gym_members.room_number,
             gym_members.telegram_name,
-            gym_members.is_admin
+            gym_members.is_admin,
+            gym_members.suspended_until,
+            gym_members.deleted_at
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
     """
@@ -282,7 +308,7 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
 
     query += " ORDER BY keys.id"
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.row_factory = sqlite3.Row
         holders = connection.execute(query, parameters).fetchall()
@@ -298,7 +324,7 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
 
 def get_key_count(database_path):
     """Return the number of tracked keys."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         row = connection.execute(
             """
@@ -322,19 +348,23 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
             holder.room_number AS holder_room_number,
             holder.telegram_name AS holder_telegram_name,
             holder.is_admin AS holder_is_admin,
+            holder.suspended_until AS holder_suspended_until,
+            holder.deleted_at AS holder_deleted_at,
             owner.id AS owner_member_id,
             owner.telegram_user_id AS owner_telegram_user_id,
             owner.name AS owner_name,
             owner.surname AS owner_surname,
             owner.room_number AS owner_room_number,
             owner.telegram_name AS owner_telegram_name,
-            owner.is_admin AS owner_is_admin
+            owner.is_admin AS owner_is_admin,
+            owner.suspended_until AS owner_suspended_until,
+            owner.deleted_at AS owner_deleted_at
         FROM keys
         JOIN gym_members holder ON holder.id = keys.current_holder_id
         JOIN gym_members owner ON owner.id = keys.owner_member_id
         WHERE keys.id = ?
     """
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
         row = connection.execute(query, (key_id,)).fetchone()
 
@@ -348,10 +378,10 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
         is_active=bool(row["is_active"]),
     )
 
-
+#TODO rewrite this function using general function that alters table based on query
 def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
     """Set a key's owner and return whether the key exists."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         cursor = connection.execute(
             """
@@ -363,10 +393,10 @@ def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
         )
     return cursor.rowcount > 0
 
-
+#TODO rewrite this function using general function that alters table based on query
 def set_key_active(database_path, key_id: int, do_activate: bool) -> bool:
     """Set a key's active status and return whether the key exists."""
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         cursor = connection.execute(
             """
             UPDATE keys
@@ -400,7 +430,9 @@ def get_key_history(
             members.surname,
             members.room_number,
             members.telegram_name,
-            members.is_admin
+            members.is_admin,
+            members.suspended_until,
+            members.deleted_at
         FROM key_holder_history history
         JOIN gym_members members ON members.id = history.holder_id
         WHERE history.key_id = ?
@@ -408,7 +440,7 @@ def get_key_history(
         LIMIT ?
     """
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
         records = connection.execute(query, (key_id, limit)).fetchall()
 
@@ -429,11 +461,13 @@ def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
         return None
     return member.id
 
-
-def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
-                                       ) -> GymMember | None:
-    """Return the registered gym member for a Telegram user, or None if absent."""
-    with sqlite3.connect(database_path) as connection:
+# TODO remove this function and replace it's usages by get_gym_member_records
+def get_gym_member_by_telegram_user_id(database_path,telegram_user_id) -> GymMember | None:
+    """
+    Deprecated. Use `get_gym_member_records` function instead.
+    
+    Return the registered gym member for a Telegram user, or None if absent."""
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.row_factory = sqlite3.Row
         member = connection.execute(
@@ -445,7 +479,9 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
                 surname,
                 room_number,
                 telegram_name,
-                is_admin
+                is_admin,
+                suspended_until,
+                deleted_at
             FROM gym_members
             WHERE telegram_user_id = ?
             """,
@@ -457,8 +493,7 @@ def get_gym_member_by_telegram_user_id(database_path,telegram_user_id
 
     return _gym_member_from_row(member)
 
-# TODO make possibility to query any field here. Make it primary member retrieval function
-def get_gym_member_records(database_path,name=None,surname=None,room_number=None,is_admin=None) -> list[GymMember]:
+def query_gym_member_records(database_path,querried_member:GymMember) -> list[GymMember]:
     """Return gym members matching the supplied filters."""
     query = """
         SELECT
@@ -468,35 +503,31 @@ def get_gym_member_records(database_path,name=None,surname=None,room_number=None
             surname,
             room_number,
             telegram_name,
-            is_admin
+            is_admin,
+            suspended_until,
+            deleted_at
         FROM gym_members
     """
     conditions = []
     parameters = []
-
-    if name is not None:
-        conditions.append("name = ? COLLATE NOCASE")
-        parameters.append(name)
-    if surname is not None:
-        conditions.append("surname = ? COLLATE NOCASE")
-        parameters.append(surname)
-    if room_number is not None:
-        conditions.append("room_number = ?")
-        parameters.append(room_number)
-    if is_admin is not None:
-        conditions.append("is_admin = ?")
-        parameters.append(is_admin)
+    for k,v in vars(querried_member).items():
+        if v is not None:
+            condition = f"{k} = ?"
+            if isinstance(v,str):
+                condition+=" COLLATE NOCASE"
+            conditions.append(condition)
+            parameters.append(v)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY surname COLLATE NOCASE, name COLLATE NOCASE, id"
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.row_factory = sqlite3.Row
-        members = connection.execute(query, parameters).fetchall()
+        fetched_members = connection.execute(query, parameters).fetchall()
 
     return [
         _gym_member_from_row(member)
-        for member in members
+        for member in fetched_members
     ]
 
 def add_gym_member(
@@ -509,7 +540,7 @@ def add_gym_member(
 ) -> GymMember:
     """Create and return a gym member."""
     try:
-        with sqlite3.connect(database_path) as connection:
+        with database_connection(database_path) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute(
                 """
@@ -543,7 +574,16 @@ def add_gym_member(
         raise RuntimeError("created gym member could not be loaded")
     return member
 
+#TODO rewrite this function using general function that alters table based on query
+def set_admin(database_path, telegram_user_id: int, is_admin: bool) -> list[GymMember]:
+    """Set admin rights and return whether the member exists."""
+    with database_connection(database_path) as connection:
+        connection.execute(
+            "UPDATE gym_members SET is_admin = ? WHERE telegram_user_id = ?",
+            (int(is_admin), telegram_user_id))
+    return query_gym_member_records(database_path,GymMember(telegram_user_id=telegram_user_id))
 
+#TODO rewrite this function using general function that alters table based on query
 def update_gym_member(
     database_path,
     telegram_user_id,
@@ -570,7 +610,7 @@ def update_gym_member(
 
     assignments = ", ".join(f"{field} = ?" for field in changes)
     parameters = [*changes.values(), telegram_user_id]
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute(
             f"""
             UPDATE gym_members
@@ -592,7 +632,7 @@ def populate_members_table_with_mock_data(database_path,n_members,rng=None):
     inserted_member_ids = []
     used_telegram_user_ids = set()
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
 
         existing_telegram_user_ids = {
@@ -642,7 +682,7 @@ def populate_test_mailboxes_and_keys(database_path):
     mailbox_member_ids = []
     key_ids = []
 
-    with sqlite3.connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
 
         for mailbox in TEST_MAILBOXES:

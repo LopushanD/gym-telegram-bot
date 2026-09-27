@@ -2,15 +2,17 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class GymMember:
-    id: int
-    telegram_user_id: int
-    name: str
-    surname: str
-    room_number: int
-    telegram_name: str | None
-    is_admin: bool
+    id: int | None = None
+    telegram_user_id: int | None = None
+    name: str | None = None
+    surname: str | None = None
+    room_number: int | None = None
+    telegram_name: str | None = None
+    is_admin: bool | None = None
+    suspended_until:str | None = None
+    deleted_at:str | None = None
 
     @property
     def full_name(self) -> str:

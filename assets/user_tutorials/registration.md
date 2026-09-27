@@ -22,7 +22,7 @@ Just tap on their `@username`, start a chat and send the information described a
 
 3\. The Gym AG member will add you to the bot database\.
 
-After registration, clear bot history with /clear or in the chat settings to remove all messages and get the starting message and buttons\. You are good to go\!
+After registration, press /start to get the starting message and buttons\. You are good to go\!
 
 
 Press on /tutorials to return to the list of tutorials\.

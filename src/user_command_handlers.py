@@ -5,9 +5,10 @@ from src.bot_replies import reply_with_start_state
 from src import messages
 from src.config import DEFAULT_DATABASE_PATH
 from src.telegram_helpers import get_update_telegram_user_id
-from src.database import get_gym_member_records
+from src.database import query_gym_member_records
 from src.command_handlers_utility import process_gym_member_records
 from src.user_commands import *
+from src.models import GymMember
 
 DELETE_LAST_N_MESSAGES = 90
 
@@ -51,9 +52,10 @@ async def return_key_tutorial_command_handler(update: Update, context:ContextTyp
 
 async def show_admins_command_handler(update: Update, context:ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
-    members = get_gym_member_records(DEFAULT_DATABASE_PATH,is_admin=True)
+    members = query_gym_member_records(DEFAULT_DATABASE_PATH,GymMember(is_admin=True))
     if members:
-        for reply in process_gym_member_records(members, "\n"+"-"*10+"\n"):
+        separator = "\n"+"-"*10+"\n"
+        for reply in process_gym_member_records(members,separator):
             await message.reply_text(reply)
     else:
         await message.reply_text(messages.USER_COMMAND_ADMINS_NOT_FOUND_TEXT)

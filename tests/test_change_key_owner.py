@@ -1,5 +1,6 @@
 import sqlite3
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ from src.config import DEFAULT_DATABASE_PATH
 from src.database import (
     add_gym_member,
     change_key_holder,
+    database_connection,
     get_key_history,
     get_key_status,
     initialize_database,
@@ -96,10 +98,8 @@ class ChangeKeyOwnerCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class SetKeyOwnerTests(unittest.TestCase):
     def setUp(self):
-        self.database_path = ":memory:"
-        connection = sqlite3.connect(self.database_path)
-        self.addCleanup(connection.close)
-        self.enterContext(patch("src.database.sqlite3.connect", return_value=connection))
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        self.database_path = Path(directory) / "test.sqlite3"
         initialize_database(self.database_path)
         self.holder = add_gym_member(
             self.database_path, 100, "Current", "Holder", 1234, "@holder",
@@ -107,7 +107,7 @@ class SetKeyOwnerTests(unittest.TestCase):
         self.owner = add_gym_member(
             self.database_path, 200, "New", "Owner", 4321, "@owner",
         )
-        with sqlite3.connect(self.database_path) as connection:
+        with database_connection(self.database_path) as connection:
             cursor = connection.execute(
                 "INSERT INTO keys (current_holder_id, owner_member_id, is_active) VALUES (?, ?, 0)",
                 (self.holder.id, self.holder.id),

@@ -114,7 +114,7 @@ class AdminCommandHelpTests(unittest.IsolatedAsyncioTestCase):
             (
                 SHOW_USERS_ADMIN_COMMAND,
                 users_command_handler,
-                "src.admin_command_handlers.get_gym_member_records",
+                "src.admin_command_handlers.query_gym_member_records",
             ),
             (
                 SHOW_KEY_HISTORY_ADMIN_COMMAND,
@@ -649,7 +649,7 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
                 "src.admin_command_handlers.get_gym_member_by_telegram_user_id",
                 return_value=build_member(100),
             ),
-            patch("src.admin_command_handlers.get_gym_member_records") as get_members,
+            patch("src.admin_command_handlers.query_gym_member_records") as get_members,
         ):
             await users_command_handler(self.update, SimpleNamespace(args=[]))
 
@@ -664,7 +664,7 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
                 "src.admin_command_handlers.get_gym_member_by_telegram_user_id",
                 return_value=build_member(100, is_admin=True),
             ),
-            patch("src.admin_command_handlers.get_gym_member_records") as get_members,
+            patch("src.admin_command_handlers.query_gym_member_records") as get_members,
         ):
             await users_command_handler(
                 self.update,
@@ -683,20 +683,18 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
                 return_value=build_member(100, is_admin=True),
             ),
             patch(
-                "src.admin_command_handlers.get_gym_member_records",
+                "src.admin_command_handlers.query_gym_member_records",
                 return_value=[],
             ) as get_members,
         ):
             await users_command_handler(
                 self.update,
-                SimpleNamespace(args=["Ada", "Lovelace", "1234"]),
+                SimpleNamespace(args=["-n", "Ada", "-s", "Lovelace", "-r", "1234"]),
             )
 
         get_members.assert_called_once_with(
             DEFAULT_DATABASE_PATH,
-            name="Ada",
-            surname="Lovelace",
-            room_number=1234,
+            GymMember(name="Ada", surname="Lovelace", room_number="1234"),
         )
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_USERS_NOT_FOUND_TEXT,
@@ -729,7 +727,7 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
                 return_value=build_member(100, is_admin=True),
             ),
             patch(
-                "src.admin_command_handlers.get_gym_member_records",
+                "src.admin_command_handlers.query_gym_member_records",
                 return_value=members,
             ) as get_members,
         ):
@@ -737,37 +735,39 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
 
         get_members.assert_called_once_with(
             DEFAULT_DATABASE_PATH,
-            name=None,
-            surname=None,
-            room_number=None,
+            GymMember(),
         )
-        expected_reply = "\n\n".join(
-            messages.gym_member_record_text(member) for member in members
+        expected_reply = (
+            "Name: Ada Lovelace\nRoom: 1234\nTelegram username: @ada\n"
+            "Telegram ID: 200\nGym member ID: 20\nis admin: True\n"
+            "Suspended until: None\nDeleted at: None\n----------\n"
+            "Name: Alan Turing\nRoom: 1235\nTelegram username: None\n"
+            "Telegram ID: 201\nGym member ID: 21\nis admin: False\n"
+            "Suspended until: None\nDeleted at: None"
         )
         self.message.reply_text.assert_awaited_once_with(expected_reply)
 
     async def test_splits_large_results_between_telegram_messages(self):
         members = [
-            GymMember(1, 100, "A", "One", 1001, None, False),
-            GymMember(2, 200, "B", "Two", 1002, None, False),
+            GymMember(1, 100, "A" * 2500, "One", 1001, None, False),
+            GymMember(2, 200, "B" * 2500, "Two", 1002, None, False),
         ]
-        member_texts = ["a" * 3000, "b" * 3000]
         with (
             patch(
                 "src.admin_command_handlers.get_gym_member_by_telegram_user_id",
                 return_value=build_member(100, is_admin=True),
             ),
-            patch("src.admin_command_handlers.get_gym_member_records", return_value=members),
-            patch(
-                "src.admin_command_handlers.messages.gym_member_record_text",
-                side_effect=member_texts,
-            ),
+            patch("src.admin_command_handlers.query_gym_member_records", return_value=members),
         ):
             await users_command_handler(self.update, SimpleNamespace(args=[]))
 
-        self.message.reply_text.assert_has_awaits(
-            [call(member_texts[0]), call(member_texts[1])],
-        )
+        self.assertEqual(2, self.message.reply_text.await_count)
+        for member, reply in zip(members, self.message.reply_text.await_args_list):
+            text = reply.args[0]
+            self.assertLessEqual(len(text), 4096)
+            self.assertIn(f"Name: {member.full_name}\n", text)
+            self.assertIn(f"Telegram ID: {member.telegram_user_id}\n", text)
+            self.assertIn("is admin: False", text)
 
 
 class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):

@@ -1,10 +1,10 @@
 *Giving a key tutorial*
 
 1\. Press _"Hand key over"_\.
-2\. Give the physical key to the next member\.
-3\. Ask the next member to open the bot and press _"Got key from member"_\.
-4\. The next member selects the number written on the key\.
-5\. The next member presses _"Confirm"_ after receiving the physical key\.
+2\. Give the physical key to the next person\.
+3\. Ask the person to open the bot and press _"Got key from person"_\.
+4\. The person selects the number written on the key\.
+5\. The person presses _"Confirm"_ after receiving the physical key\.
 
 After the receiver confirms, the bot records them as the new key holder\.
 
@@ -17,4 +17,4 @@ After the receiver confirms, the bot records them as the new key holder\.
 
 Press on /tutorials to return to the list of tutorials\.
 
-Press on /clear to delete all messages and get starting message and buttons\.
+Press on /start to get the starting message and buttons\.

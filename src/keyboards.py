@@ -84,7 +84,7 @@ def build_start_keyboard(include_holder_actions: bool = False) -> InlineKeyboard
     else:
         keyboard.extend([
             [
-                InlineKeyboardButton("Got key from member", callback_data=RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK),
+                InlineKeyboardButton("Got key from person", callback_data=RECEIVER_HANDOVER_KEY_OBTAINED_CALLBACK),
                 InlineKeyboardButton("Got key from mailbox", callback_data=RECEIVER_MAILBOX_KEY_OBTAINED_CALLBACK),
             ],
         ])

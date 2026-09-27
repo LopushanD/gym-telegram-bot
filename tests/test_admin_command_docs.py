@@ -15,6 +15,7 @@ from src.admin_commands import (
     SHOW_KEY_STATUS_ADMIN_COMMAND,
     SHOW_USERS_ADMIN_COMMAND,
     UPDATE_USER_ADMIN_COMMAND,
+    SET_ADMIN_ADMIN_COMMAND,
     load_command_documentation,
 )
 
@@ -25,6 +26,7 @@ class AdminCommandDocumentationTests(unittest.TestCase):
             ADD_USER_ADMIN_COMMAND,
             CHANGE_KEY_OWNER_ADMIN_COMMAND,
             UPDATE_USER_ADMIN_COMMAND,
+            SET_ADMIN_ADMIN_COMMAND,
             GIVE_KEY_ADMIN_COMMAND,
             SHOW_USERS_ADMIN_COMMAND,
             SHOW_KEY_HISTORY_ADMIN_COMMAND,

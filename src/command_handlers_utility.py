@@ -28,15 +28,25 @@ def _split_record_texts(record_texts: list[str], separator: str) -> list[str]:
             replies.append(record_text)
     return replies
 
-def process_gym_member_records(members: list[GymMember], separator: str) -> list[str]:
+def process_gym_member_records(members: list[GymMember], separator: str,showTechnicalIDs: bool = False, showMemberStatus:bool = False,showAdminStatus=False) -> list[str]:
     replies = []
     records = []
     for member in members:
         record = "\n".join([
-        "Gym member ID: "+str(member.id),"Name: "+member.full_name,
+        "Name: "+member.full_name,
         "Room: "+str(member.room_number),
-        "Telegram username: "+member.telegram_name if member.telegram_name is not None else "Telegram username: None",
-        "Telegram ID: "+str(member.telegram_user_id)])
+        "Telegram username: "+member.telegram_name if member.telegram_name is not None else "Telegram username: None"])
+        if showTechnicalIDs:
+            record = "\n".join([record,
+            "Telegram ID: "+str(member.telegram_user_id),
+            "Gym member ID: "+str(member.id)])
+        if showAdminStatus:
+            record = "\n".join([record,
+            f"is admin: {member.is_admin}"])
+        if showMemberStatus:
+            record = "\n".join([record,
+            "Suspended until: "+member.suspended_until if member.suspended_until is not None else "Suspended until: None",
+            "Deleted at: "+member.deleted_at if member.deleted_at is not None else "Deleted at: None"])
         records.append(record)
     replies = _split_record_texts(records,separator)
     return replies

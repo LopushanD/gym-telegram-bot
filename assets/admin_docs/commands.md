@@ -16,11 +16,12 @@ Register a new gym member\.
 Update specific gym member fields\. Options can be supplied in any order\.
 Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`, `-t` or `--telegram-name`\.
 
+`/users option value [option value ...]`
+List gym members matching the optional filters\.
+Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`\.
+
 `/givekey key_id telegram_id`
 Record that a registered gym member received a key\.
-
-`/users [name] [surname] [room]`
-List gym members matching the optional filters\.
 
 `/keyhistory key_id [last_n_records]`
 List recent _n_ holder changes for a key\. _n_ defaults to 5\.
@@ -36,3 +37,6 @@ Activate a key\.
 
 `/deactivatekey key_id`
 Deactivate a key\.
+
+`/setadmin telegram_id True/False`
+Grant or remove admin rights for a registered gym member\.

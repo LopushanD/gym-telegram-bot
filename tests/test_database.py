@@ -18,7 +18,7 @@ from src.database import (
     get_current_keyholder_info,
     get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
-    get_gym_member_records,
+    query_gym_member_records,
     get_key_id_by_telegram_user_id,
     get_key_count,
     get_key_history,
@@ -907,7 +907,7 @@ class DatabaseTests(unittest.TestCase):
                     name="Ada",
                 )
 
-            members = get_gym_member_records(
+            members = query_gym_member_records(
                 database_path,
                 name="ada",
                 surname="lovelace",
