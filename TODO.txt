@@ -1,5 +1,5 @@
 ---------- FIRST PRIORITY ----------
-- make it impossible for not registered users to read data (see information) (now they just cannot write it)
+- make handover timeout bigger (now it's only 30 sec)
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
         (At least take a look if it's an actual problem)
 ---------- SECOND PRIORITY ----------

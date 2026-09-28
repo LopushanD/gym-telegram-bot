@@ -1,6 +1,6 @@
 from src.config import HANDOVER_WINDOW_SECONDS,TELEGRAM_CONTACT_NAME
 from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
-from src.user_commands import TUTORIALS_INFO_TUTORIAL
+from src.user_commands import TUTORIALS_INFO_TUTORIAL,SHOW_ADMINS_USER_COMMAND
 
 UNKNOWN_EXCEPTION = "Unknown error occured."
 # Message constants use WHAT_POV_ACTION_KIND.
@@ -14,7 +14,7 @@ USER_TUTORIAL_EMPTY_TEXT = "The tutorial is not available yet."
 USER_COMMAND_ADMINS_NOT_FOUND_TEXT = "There are currently no active gym AG members."
 KEY_RECEIVER_CONFIRM_NOTICE = "Confirm before recording."
 KEY_RECEIVER_RECORD_PROMPT = "Confirm that you received key {key_id} from {from_member}."
-
+KEYHOLDERS_NOT_FOUND = f"Nobody holds keys right now. It should not be like that. Please, report it to admins. /{SHOW_ADMINS_USER_COMMAND}"
 HANDOVER_HOLDER_BLOCKED_TEXT = "Only the current key holder can do that."
 HANDOVER_HOLDER_STARTED_TEXT = f"Handover started. Give the key to the next member and ask them to confirm it in the bot within {HANDOVER_WINDOW_SECONDS} seconds.."
 
@@ -90,13 +90,11 @@ def current_key_holder_text(holder: KeyHolder) -> str:
         f"Key {holder.key_id} is currently held by {member.full_name}, "
         f"room {member.room_number}."
     )
-    if member.telegram_name is None:
-        telegram_name = "None"
-    else:
+    if member.telegram_name is not None:
         telegram_name = member.telegram_name
         if not telegram_name.startswith("@"):
             telegram_name = f"@{telegram_name}"
-    text += f"\nTelegram name: {telegram_name}"
+        text += f"\nTelegram name: {telegram_name}"
     return text
 
 # TODO I think it's better to get rid of this function and make local

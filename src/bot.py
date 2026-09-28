@@ -102,11 +102,16 @@ async def callback_query_handler(update: Update,context) -> None:
         await handler(query, received_message)
 
 async def handle_key_request(query: CallbackQuery, message: Message) -> None:
-    keyholders = get_keyholders(DEFAULT_DATABASE_PATH)
-    if keyholders is None:
-        text = messages.START_USER_MENU_TEXT
+    telegram_user_id = query.from_user.id
+    member = get_gym_member_by_telegram_user_id(DEFAULT_DATABASE_PATH,telegram_user_id)
+    if member is None:
+        text = messages.AUTH_USER_UNREGISTERED_TEXT
     else:
-        text = "\n\n".join([messages.current_key_holder_text(holder) for holder in keyholders])
+        keyholders = get_keyholders(DEFAULT_DATABASE_PATH)
+        if keyholders is None:
+            text = messages.KEYHOLDERS_NOT_FOUND
+        else:
+            text = "\n\n".join([messages.current_key_holder_text(holder) for holder in keyholders])
     await edit_to_start_state(
         message,
         text,

@@ -276,10 +276,11 @@ def get_key_id_by_telegram_user_id(database_path, telegram_user_id):
 
 def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_member_id=None
                                     ) -> list[KeyHolder]:
-    """Return current holder details for all keys."""
+    """Return current holder details for all active keys."""
     query = """
         SELECT
             keys.id AS key_id,
+            keys.is_active as is_active,
             gym_members.id AS member_id,
             gym_members.telegram_user_id,
             gym_members.name,
@@ -292,8 +293,8 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
         FROM keys
         JOIN gym_members ON gym_members.id = keys.current_holder_id
     """
-    conditions = []
-    parameters = []
+    conditions = ["keys.is_active = ?"]
+    parameters = [True]
 
     if telegram_user_id is not None:
         conditions.append("gym_members.telegram_user_id = ?")
@@ -461,37 +462,14 @@ def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
         return None
     return member.id
 
-# TODO remove this function and replace it's usages by get_gym_member_records
 def get_gym_member_by_telegram_user_id(database_path,telegram_user_id) -> GymMember | None:
     """
-    Deprecated. Use `get_gym_member_records` function instead.
-    
     Return the registered gym member for a Telegram user, or None if absent."""
-    with database_connection(database_path) as connection:
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.row_factory = sqlite3.Row
-        member = connection.execute(
-            """
-            SELECT
-                id AS member_id,
-                telegram_user_id,
-                name,
-                surname,
-                room_number,
-                telegram_name,
-                is_admin,
-                suspended_until,
-                deleted_at
-            FROM gym_members
-            WHERE telegram_user_id = ?
-            """,
-            (telegram_user_id,),
-        ).fetchone()
-
-    if member is None:
-        return None
-
-    return _gym_member_from_row(member)
+    if telegram_user_id is not None:
+        members = query_gym_member_records(database_path,GymMember(telegram_user_id=telegram_user_id))
+        if members:
+            return members[0]
+    return None
 
 def query_gym_member_records(database_path,querried_member:GymMember) -> list[GymMember]:
     """Return gym members matching the supplied filters."""
