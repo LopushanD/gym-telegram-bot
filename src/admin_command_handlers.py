@@ -1,6 +1,6 @@
 from telegram import Update
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH,LAST_N_RECORDS_DEFAULT
+from src.config import DATABASE_PATH,LAST_N_RECORDS_DEFAULT
 from src.admin_commands import *
 from src.command_handlers_utility import *
 from src.database import (
@@ -27,7 +27,7 @@ async def reply_with_command_documentation(message, command_name: str) -> None:
 async def _user_is_admin(update:Update)->bool:
     message = update.effective_message
     requesting_member = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
+        DATABASE_PATH,
         get_update_telegram_user_id(update))
     if requesting_member is None:
         await message.reply_text(messages.AUTH_USER_UNREGISTERED_TEXT)
@@ -58,7 +58,7 @@ async def set_admin_command_handler(update: Update, context) -> None:
         await message.reply_text(messages.ADMIN_SET_ADMIN_BAD_VALUE_TEXT)
         return
     admin_set_value = admin_set_value == "true" #transform value to boolean
-    members = set_admin(DEFAULT_DATABASE_PATH, telegram_user_id, admin_set_value)
+    members = set_admin(DATABASE_PATH, telegram_user_id, admin_set_value)
     if not members: # there can be 0 or 1 user with given telegram ID
         await message.reply_text(
             messages.ADMIN_SET_ADMIN_NOT_FOUND_TEXT.format(telegram_user_id=telegram_user_id)
@@ -96,14 +96,13 @@ async def add_user_command_handler(update: Update, context) -> None:
 
     reply = None
     try:
-        member = add_gym_member(
-            DEFAULT_DATABASE_PATH,
+        new_user = GymMember(
             telegram_user_id=telegram_user_id,
             name=arguments[1],
             surname=arguments[2],
             room_number=room_number,
-            telegram_name=arguments[4],
-        )
+            telegram_name=arguments[4])
+        add_gym_member(DATABASE_PATH,new_user)
     except GymMemberAlreadyExistsError:
         reply = messages.ADMIN_ADD_USER_ALREADY_EXISTS_TEXT.format(
             telegram_user_id=telegram_user_id,
@@ -112,10 +111,9 @@ async def add_user_command_handler(update: Update, context) -> None:
         reply = messages.UNKNOWN_EXCEPTION
     else:
         reply = messages.ADMIN_ADD_USER_COMPLETED_TEXT.format(
-            member=member.full_name,
+            member=new_user.full_name,
             telegram_user_id=telegram_user_id,
-            room_number=room_number,
-        )
+            room_number=room_number)
     await message.reply_text(reply)
 
 async def get_all_commands_handler(update: Update, context) -> None:
@@ -148,7 +146,7 @@ async def give_key_command_handler(update: Update, context) -> None:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
     #======================
-    result = give_key_to_member(DEFAULT_DATABASE_PATH, key_id, telegram_user_id)
+    result = give_key_to_member(DATABASE_PATH, key_id, telegram_user_id)
     if result.status == GiveKeyStatus.USER_NOT_REGISTERED:
         reply = messages.ADMIN_GIVE_KEY_USER_NOT_REGISTERED_TEXT.format(
             telegram_user_id=telegram_user_id)
@@ -190,7 +188,7 @@ async def change_key_owner_command_handler(update: Update, context) -> None:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
 
-    member = get_gym_member_by_telegram_user_id(DEFAULT_DATABASE_PATH, telegram_user_id)
+    member = get_gym_member_by_telegram_user_id(DATABASE_PATH, telegram_user_id)
     if member is None:
         await message.reply_text(
             messages.ADMIN_CHANGE_KEY_OWNER_USER_NOT_REGISTERED_TEXT.format(
@@ -199,7 +197,7 @@ async def change_key_owner_command_handler(update: Update, context) -> None:
         )
         return
 
-    if not set_key_owner(DEFAULT_DATABASE_PATH, key_id, member.id):
+    if not set_key_owner(DATABASE_PATH, key_id, member.id):
         await message.reply_text(messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id))
         return
 
@@ -232,7 +230,7 @@ async def update_user_command_handler(update: Update, context) -> None:
         return
 
     member_before = get_gym_member_by_telegram_user_id(
-        DEFAULT_DATABASE_PATH,
+        DATABASE_PATH,
         telegram_user_id)
     if member_before is None:
         await message.reply_text(
@@ -241,7 +239,7 @@ async def update_user_command_handler(update: Update, context) -> None:
         return
     # TODO check this code, reformat if needed
     member_after = update_gym_member(
-        DEFAULT_DATABASE_PATH,
+        DATABASE_PATH,
         telegram_user_id,
         **updates)
     if member_after is None:
@@ -271,7 +269,7 @@ async def users_command_handler(update: Update, context) -> None:
     try:
         gym_member_dict = parse_user_command_arguments(arguments)
         members = query_gym_member_records(
-            DEFAULT_DATABASE_PATH,
+            DATABASE_PATH,
             GymMember(name=gym_member_dict["name"],
             surname=gym_member_dict["surname"],
             room_number=gym_member_dict["room_number"]))
@@ -309,7 +307,7 @@ async def key_history_command_handler(update: Update, context) -> None:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
 
-    records = get_key_history(DEFAULT_DATABASE_PATH, key_id, limit)
+    records = get_key_history(DATABASE_PATH, key_id, limit)
     if records:
         replies = process_key_history_records(records,"\n"+"-"*10+"\n")
         for reply in replies:
@@ -341,7 +339,7 @@ async def key_status_command_handler(update: Update, context) -> None:
     # TODO make key status message more readable. Add something like process_key_status_records
     # even better is to try to make more abstract parent record processor and more specific
     # processors as it's children
-    status = get_key_status(DEFAULT_DATABASE_PATH, key_id)
+    status = get_key_status(DATABASE_PATH, key_id)
     if status is None:
         await message.reply_text(
             messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id),
@@ -386,7 +384,7 @@ async def set_key_active_command_handler(
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
 
-    if not set_key_active(DEFAULT_DATABASE_PATH, key_id, do_activate):
+    if not set_key_active(DATABASE_PATH, key_id, do_activate):
         await message.reply_text(messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id))
         return
 

@@ -8,7 +8,7 @@ from datetime import datetime
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
-from src.config import DEFAULT_DATABASE_PATH
+from src.config import DATABASE_PATH
 
 
 @contextmanager
@@ -101,17 +101,6 @@ def initialize_database(database_path):
             )
             """
         )
-        ###########################
-        #TODO remove that code later. Needed to alter existing table
-        member_columns = {
-            row[1] for row in connection.execute("PRAGMA table_info(gym_members)")
-        }
-        for column_name in ("deleted_at", "suspended_until"):
-            if column_name not in member_columns:
-                connection.execute(
-                    f"ALTER TABLE gym_members ADD COLUMN {column_name} TIMESTAMP DEFAULT NULL"
-                )
-        ###########################
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS keys (
@@ -509,13 +498,7 @@ def query_gym_member_records(database_path,querried_member:GymMember) -> list[Gy
     ]
 
 def add_gym_member(
-    database_path,
-    telegram_user_id,
-    name,
-    surname,
-    room_number,
-    telegram_name,
-) -> GymMember:
+    database_path,new_user:GymMember) -> None:
     """Create and return a gym member."""
     try:
         with database_connection(database_path) as connection:
@@ -532,26 +515,21 @@ def add_gym_member(
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (
-                    telegram_user_id,
-                    name,
-                    surname,
-                    room_number,
-                    telegram_name,
+                    new_user.telegram_user_id,
+                    new_user.name,
+                    new_user.surname,
+                    new_user.room_number,
+                    new_user.telegram_name,
                 ),
             )
     except sqlite3.IntegrityError as error:
-        if get_gym_member_by_telegram_user_id(database_path, telegram_user_id):
+        if get_gym_member_by_telegram_user_id(database_path, new_user.telegram_user_id):
             raise GymMemberAlreadyExistsError(
-                f"gym member already exists for Telegram ID: {telegram_user_id}"
+                f"gym member already exists for Telegram ID: {new_user.telegram_user_id}"
             ) from error
         else:
             raise
-
-    member = get_gym_member_by_telegram_user_id(database_path, telegram_user_id)
-    if member is None:
-        raise RuntimeError("created gym member could not be loaded")
-    return member
-
+        
 #TODO rewrite this function using general function that alters table based on query
 def set_admin(database_path, telegram_user_id: int, is_admin: bool) -> list[GymMember]:
     """Set admin rights and return whether the member exists."""
@@ -732,6 +710,6 @@ def _generate_unique_telegram_user_id(rng, used_telegram_user_ids):
 
 
 if __name__ == "__main__":
-    initialize_database(DEFAULT_DATABASE_PATH)
-    populate_members_table_with_mock_data(DEFAULT_DATABASE_PATH, 5,None)
-    populate_test_mailboxes_and_keys(DEFAULT_DATABASE_PATH)
+    initialize_database(DATABASE_PATH)
+    populate_members_table_with_mock_data(DATABASE_PATH, 5,None)
+    populate_test_mailboxes_and_keys(DATABASE_PATH)

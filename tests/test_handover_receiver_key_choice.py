@@ -78,7 +78,7 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         ):
             await bot.handle_key_obtained(query, message)
 
-        get_key_count.assert_called_once_with(bot.DEFAULT_DATABASE_PATH)
+        get_key_count.assert_called_once_with(bot.DATABASE_PATH)
         backend.assert_not_called()
         query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()

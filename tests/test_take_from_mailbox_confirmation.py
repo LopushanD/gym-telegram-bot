@@ -53,7 +53,7 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         ):
             await bot.handle_key_obtained_from_mailbox(query, message)
 
-        get_key_count.assert_called_once_with(bot.DEFAULT_DATABASE_PATH)
+        get_key_count.assert_called_once_with(bot.DATABASE_PATH)
         take_key_from_mailbox.assert_not_called()
         query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
@@ -139,7 +139,7 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
             await bot.handle_key_obtained_from_mailbox_confirmation(query, message)
 
         take_key_from_mailbox.assert_called_once_with(
-            bot.DEFAULT_DATABASE_PATH,
+            bot.DATABASE_PATH,
             123,
             2,
             mailbox_member_id,

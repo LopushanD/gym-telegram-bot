@@ -72,7 +72,7 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         ):
             await bot.handle_key_return_mailbox(query, message)
 
-        get_key_return_instruction.assert_called_once_with(bot.DEFAULT_DATABASE_PATH, 123)
+        get_key_return_instruction.assert_called_once_with(bot.DATABASE_PATH, 123)
         return_key_to_mailbox.assert_not_called()
         query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
@@ -166,7 +166,7 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
             await bot.handle_key_return_mailbox_confirmation(query, message)
 
         return_key_to_mailbox.assert_called_once_with(
-            bot.DEFAULT_DATABASE_PATH,
+            bot.DATABASE_PATH,
             123,
             2,
         )

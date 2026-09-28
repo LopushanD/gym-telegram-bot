@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 from src import messages
 from src.admin_command_handlers import set_admin_command_handler
 from src.admin_commands import load_command_documentation
-from src.config import DEFAULT_DATABASE_PATH
+from src.config import DATABASE_PATH
 from src.database import (
     add_gym_member,
     database_connection,
@@ -52,7 +52,7 @@ class SetAdminCommandTests(unittest.IsolatedAsyncioTestCase):
                 self.message.reply_text.reset_mock()
                 self.set_admin.return_value[0].is_admin = expected
                 await set_admin_command_handler(self.update, SimpleNamespace(args=["200", value]))
-                self.set_admin.assert_called_once_with(DEFAULT_DATABASE_PATH, 200, expected)
+                self.set_admin.assert_called_once_with(DATABASE_PATH, 200, expected)
                 self.message.reply_text.assert_awaited_once_with(
                     messages.ADMIN_SET_ADMIN_COMPLETED_TEXT.format(
                         member="Name: Alan Turing\nRoom: 102\nTelegram username: @alan\n"
@@ -89,7 +89,7 @@ class SetAdminCommandTests(unittest.IsolatedAsyncioTestCase):
     async def test_admin_can_revoke_own_rights(self):
         self.set_admin.return_value = [GymMember(telegram_user_id=100, is_admin=False)]
         await set_admin_command_handler(self.update, SimpleNamespace(args=["100", "False"]))
-        self.set_admin.assert_called_once_with(DEFAULT_DATABASE_PATH, 100, False)
+        self.set_admin.assert_called_once_with(DATABASE_PATH, 100, False)
 
 
 class SetAdminDatabaseTests(unittest.TestCase):

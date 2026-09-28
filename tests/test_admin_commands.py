@@ -35,7 +35,7 @@ from src.admin_command_handlers import (
     update_user_command_handler,
     users_command_handler,
 )
-from src.config import DEFAULT_DATABASE_PATH
+from src.config import DATABASE_PATH
 from src.database import GymMemberAlreadyExistsError
 from src.key_service import GiveKeyResult, GiveKeyStatus
 from src.models import GymMember, KeyHistoryRecord, KeyStatus
@@ -261,7 +261,7 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(args=["1", "200"]),
             )
 
-        give_key.assert_called_once_with(DEFAULT_DATABASE_PATH, 1, 200)
+        give_key.assert_called_once_with(DATABASE_PATH, 1, 200)
         cancel_handover.assert_called_once_with(1)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_GIVE_KEY_COMPLETED_TEXT.format(
@@ -389,7 +389,7 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         add_member.assert_called_once_with(
-            DEFAULT_DATABASE_PATH,
+            DATABASE_PATH,
             telegram_user_id=200,
             name="Ada",
             surname="Lovelace",
@@ -591,7 +591,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         update_member.assert_called_once_with(
-            DEFAULT_DATABASE_PATH,
+            DATABASE_PATH,
             200,
             name="Ada",
             room_number=4321,
@@ -626,7 +626,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         update_member.assert_called_once_with(
-            DEFAULT_DATABASE_PATH,
+            DATABASE_PATH,
             200,
             name="Dima",
         )
@@ -693,7 +693,7 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         get_members.assert_called_once_with(
-            DEFAULT_DATABASE_PATH,
+            DATABASE_PATH,
             GymMember(name="Ada", surname="Lovelace", room_number="1234"),
         )
         self.message.reply_text.assert_awaited_once_with(
@@ -734,7 +734,7 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
             await users_command_handler(self.update, SimpleNamespace(args=[]))
 
         get_members.assert_called_once_with(
-            DEFAULT_DATABASE_PATH,
+            DATABASE_PATH,
             GymMember(),
         )
         expected_reply = (
@@ -827,7 +827,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
         ):
             await key_history_command_handler(self.update, SimpleNamespace(args=["2"]))
 
-        get_history.assert_called_once_with(DEFAULT_DATABASE_PATH, 2, 5)
+        get_history.assert_called_once_with(DATABASE_PATH, 2, 5)
         self.message.reply_text.assert_awaited_once_with(
             messages.key_history_record_text(record),
         )
@@ -848,7 +848,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(args=["10"]),
             )
 
-        get_history.assert_called_once_with(DEFAULT_DATABASE_PATH, 10, 5)
+        get_history.assert_called_once_with(DATABASE_PATH, 10, 5)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_KEY_HISTORY_NOT_FOUND_TEXT,
         )
@@ -869,7 +869,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(args=["2", "10"]),
             )
 
-        get_history.assert_called_once_with(DEFAULT_DATABASE_PATH, 2, 10)
+        get_history.assert_called_once_with(DATABASE_PATH, 2, 10)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_KEY_HISTORY_NOT_FOUND_TEXT,
         )
@@ -939,7 +939,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
         ):
             await key_status_command_handler(self.update, SimpleNamespace(args=["99"]))
 
-        get_status.assert_called_once_with(DEFAULT_DATABASE_PATH, 99)
+        get_status.assert_called_once_with(DATABASE_PATH, 99)
         self.message.reply_text.assert_awaited_once_with(
             messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
         )
@@ -1013,7 +1013,7 @@ class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
         ):
             await activate_key_command_handler(self.update, SimpleNamespace(args=["99"]))
 
-        set_active.assert_called_once_with(DEFAULT_DATABASE_PATH, 99, True)
+        set_active.assert_called_once_with(DATABASE_PATH, 99, True)
         self.message.reply_text.assert_awaited_once_with(
             messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
         )
@@ -1028,7 +1028,7 @@ class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
         ):
             await activate_key_command_handler(self.update, SimpleNamespace(args=["2"]))
 
-        set_active.assert_called_once_with(DEFAULT_DATABASE_PATH, 2, True)
+        set_active.assert_called_once_with(DATABASE_PATH, 2, True)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_ACTIVATE_KEY_COMPLETED_TEXT.format(key_id=2),
         )
@@ -1043,7 +1043,7 @@ class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
         ):
             await deactivate_key_command_handler(self.update, SimpleNamespace(args=["2"]))
 
-        set_active.assert_called_once_with(DEFAULT_DATABASE_PATH, 2, False)
+        set_active.assert_called_once_with(DATABASE_PATH, 2, False)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT.format(key_id=2),
         )

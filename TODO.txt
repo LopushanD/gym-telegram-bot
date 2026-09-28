@@ -1,9 +1,11 @@
 ---------- FIRST PRIORITY ----------
+- On 4th of october change KEYHOLDERS_NOT_FOUND variable in messages back to it's original value
 - make handover timeout bigger (now it's only 30 sec)
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
         (At least take a look if it's an actual problem)
 ---------- SECOND PRIORITY ----------
 - add /deleteuser admin command. It sets deleted_at column to currect timestamp (if the column is not NULL, it means user was deleted)
+- change /keystatus so, that you can see multiple keys (make it similar to /users querry)
 - add a logger that will be able to export logs that are sent to docker terminal by telegram (needed for debugging purposes)
 - remove redundant functions from database.py. Leave only the most general ones.
 - commands that write to database should also be logged in a dedicated table.

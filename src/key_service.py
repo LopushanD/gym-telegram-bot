@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from src.config import DEFAULT_DATABASE_PATH
+from src.config import DATABASE_PATH
 from src.models import GymMember, KeyHolder
 from src.database import (
     change_key_holder,
@@ -103,7 +103,7 @@ def can_start_key_handover(database_path, telegram_user_id, key_id):
 
 def return_key_to_mailbox(database_path,telegram_user_id,key_id):
     if user_currently_holds_key(database_path, telegram_user_id, key_id):
-        mailbox = get_key_owner_mailbox_info(DEFAULT_DATABASE_PATH, key_id)
+        mailbox = get_key_owner_mailbox_info(DATABASE_PATH, key_id)
         change_key_holder(database_path, key_id, mailbox.id)
         return ReturnToMailboxResult(status=ReturnToMailboxStatus.RETURNED)
     return ReturnToMailboxResult(status=ReturnToMailboxStatus.NOT_CURRENT_HOLDER)

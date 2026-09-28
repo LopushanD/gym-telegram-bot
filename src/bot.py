@@ -40,7 +40,7 @@ from src.keyboards import (
     callback_matches_prefix,
     parse_key_id_callback,
 )
-from src.config import BOT_TOKEN, DEFAULT_DATABASE_PATH
+from src.config import BOT_TOKEN, DATABASE_PATH
 from src.database import initialize_database,get_key_owner_mailbox_info,get_key_id_by_telegram_user_id
 from src.handover_flow import (
     handle_key_handover,
@@ -103,11 +103,11 @@ async def callback_query_handler(update: Update,context) -> None:
 
 async def handle_key_request(query: CallbackQuery, message: Message) -> None:
     telegram_user_id = query.from_user.id
-    member = get_gym_member_by_telegram_user_id(DEFAULT_DATABASE_PATH,telegram_user_id)
+    member = get_gym_member_by_telegram_user_id(DATABASE_PATH,telegram_user_id)
     if member is None:
         text = messages.AUTH_USER_UNREGISTERED_TEXT
     else:
-        keyholders = get_keyholders(DEFAULT_DATABASE_PATH)
+        keyholders = get_keyholders(DATABASE_PATH)
         if keyholders is None:
             text = messages.KEYHOLDERS_NOT_FOUND
         else:
@@ -120,7 +120,7 @@ async def handle_key_request(query: CallbackQuery, message: Message) -> None:
 
 async def handle_key_obtained(query: CallbackQuery, message: Message) -> None:
     await query.answer()
-    key_count = get_key_count(DEFAULT_DATABASE_PATH)
+    key_count = get_key_count(DATABASE_PATH)
     await message.edit_text(
         messages.KEY_CHOICE_PROMPT,
         reply_markup=build_key_obtained_receiver_key_choice_keyboard(key_count))
@@ -136,7 +136,7 @@ async def handle_key_handover_callback(query: CallbackQuery,message: Message) ->
     #TODO: now it first reads database to fetch id of the key holder holds and then
     # it later checks if holder actually holds the key -> needles double check
     #that uses query to database -> remake whenever possible
-    key_id = get_key_id_by_telegram_user_id(DEFAULT_DATABASE_PATH,telegram_id)
+    key_id = get_key_id_by_telegram_user_id(DATABASE_PATH,telegram_id)
     await handle_key_handover(key_id, query, message, edit_to_start_state)
 
 async def handle_key_obtained_confirmation(query: CallbackQuery,message: Message) -> None:
@@ -157,13 +157,13 @@ async def handle_unknown_callback(query: CallbackQuery, message: Message) -> Non
 async def handle_holder_key_handover_cancellation(query: CallbackQuery, message: Message):
   await query.answer()
   telegram_id = get_callback_telegram_user_id(query)
-  key_id = get_key_id_by_telegram_user_id(DEFAULT_DATABASE_PATH,telegram_id)
+  key_id = get_key_id_by_telegram_user_id(DATABASE_PATH,telegram_id)
   await handle_pending_handover_cancellation(key_id,query,message)
 
 async def handle_key_return_mailbox(query: CallbackQuery, message: Message) -> None:
     await query.answer()
     return_instruction = get_key_return_instruction(
-        DEFAULT_DATABASE_PATH,
+        DATABASE_PATH,
         get_callback_telegram_user_id(query),
     )
     if return_instruction is None:
@@ -202,7 +202,7 @@ async def handle_key_return_mailbox_confirmation(query: CallbackQuery,message: M
         query.data,
         HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK_PREFIX,
     )
-    result = return_key_to_mailbox(DEFAULT_DATABASE_PATH, telegram_user_id, key_id)
+    result = return_key_to_mailbox(DATABASE_PATH, telegram_user_id, key_id)
     if result.status == ReturnToMailboxStatus.RETURNED:
         reply = messages.MAILBOX_HOLDER_RETURNED_TEXT.format(key_id=key_id)
     else:
@@ -217,7 +217,7 @@ async def handle_key_return_mailbox_cancellation(query: CallbackQuery,message: M
 
 async def handle_key_obtained_from_mailbox(query: CallbackQuery,message: Message) -> None:
     await query.answer()
-    key_count = get_key_count(DEFAULT_DATABASE_PATH)
+    key_count = get_key_count(DATABASE_PATH)
     await message.edit_text(
         messages.KEY_CHOICE_PROMPT,
         reply_markup=build_key_obtained_mailbox_key_choice_keyboard(key_count),
@@ -242,8 +242,8 @@ async def handle_key_obtained_from_mailbox_confirmation(query: CallbackQuery,mes
         query.data,
         RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX,
     )
-    mailbox = get_key_owner_mailbox_info(DEFAULT_DATABASE_PATH, key_id)
-    result = take_key_from_mailbox(DEFAULT_DATABASE_PATH,telegram_user_id,key_id,mailbox.id)
+    mailbox = get_key_owner_mailbox_info(DATABASE_PATH, key_id)
+    result = take_key_from_mailbox(DATABASE_PATH,telegram_user_id,key_id,mailbox.id)
     if result.status == TakeFromMailboxStatus.TAKEN:
         reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT.format(key_id=key_id)
     elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
@@ -282,7 +282,7 @@ CALLBACK_HANDLERS: dict[str, CallbackHandler] = {
 
 def main() -> None:
     """Run the Telegram bot."""
-    initialize_database(DEFAULT_DATABASE_PATH)
+    initialize_database(DATABASE_PATH)
     application = (
         Application.builder()
         .token(BOT_TOKEN)

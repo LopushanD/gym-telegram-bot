@@ -1,7 +1,7 @@
 from telegram import Message
 
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH
+from src.config import DATABASE_PATH
 from src.key_service import user_currently_holds_key,user_currently_holds_any_key
 from src.keyboards import build_key_handover_holder_keyboard, build_start_keyboard
 
@@ -9,7 +9,7 @@ from src.keyboards import build_key_handover_holder_keyboard, build_start_keyboa
 def _build_start_state_markup(telegram_user_id: int | None = None):
     return build_start_keyboard(
         include_holder_actions=user_currently_holds_any_key(
-            DEFAULT_DATABASE_PATH,
+            DATABASE_PATH,
             telegram_user_id,
         )
     )

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from telegram import CallbackQuery, Message
 from src.bot_replies import edit_to_holder_handover_cancel, edit_to_start_state
 from src import messages
-from src.config import DEFAULT_DATABASE_PATH, HANDOVER_WINDOW_SECONDS
+from src.config import DATABASE_PATH, HANDOVER_WINDOW_SECONDS
 from src.database import change_key_holder, get_gym_member_by_telegram_user_id
 from src.keyboards import build_key_obtained_receiver_confirmation_keyboard
 from src.key_service import user_currently_holds_key
@@ -77,12 +77,12 @@ def cancel_pending_handover(key_id: int) -> bool:
 
 async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state_change_function: StartStateReply) -> None:
     telegram_user_id = get_callback_telegram_user_id(query)
-    if not user_currently_holds_key(DEFAULT_DATABASE_PATH, telegram_user_id, key_id):
+    if not user_currently_holds_key(DATABASE_PATH, telegram_user_id, key_id):
         reply = messages.HANDOVER_HOLDER_BLOCKED_TEXT
     elif key_id in PENDING_HANDOVERS:
         reply = messages.HANDOVER_HOLDER_PENDING_TEXT.format(key_id=key_id)
     else:
-        holder = get_gym_member_by_telegram_user_id(DEFAULT_DATABASE_PATH,telegram_user_id)
+        holder = get_gym_member_by_telegram_user_id(DATABASE_PATH,telegram_user_id)
         start_pending_handover(key_id,holder,message,state_change_function)
         # If reached this point, everything went successfully
         reply = messages.HANDOVER_HOLDER_STARTED_TEXT
@@ -131,7 +131,7 @@ async def handle_pending_handover_confirmation(key_id,query: CallbackQuery,messa
         if telegram_user_id == pending_handover.holder.telegram_user_id:
             reply = messages.HANDOVER_RECEIVER_SELF_TEXT
         else:
-            member = get_gym_member_by_telegram_user_id(DEFAULT_DATABASE_PATH,telegram_user_id)
+            member = get_gym_member_by_telegram_user_id(DATABASE_PATH,telegram_user_id)
             if member is None:
                 reply = messages.AUTH_USER_UNREGISTERED_TEXT
     if reply is not None:
@@ -146,7 +146,7 @@ async def complete_handover_interaction(
     query: CallbackQuery,
     pending_handover: PendingHandover,
 ) -> None:
-    change_key_holder(DEFAULT_DATABASE_PATH, key_id, receiver.id)
+    change_key_holder(DATABASE_PATH, key_id, receiver.id)
     PENDING_HANDOVERS.pop(key_id)
     pending_handover.timeout_task.cancel()
     handover_text = messages.HANDOVER_BOTH_COMPLETED_TEXT.format(

@@ -2,4 +2,5 @@ __*
 *.sqlite3
 .*
 *.env
+commit.txt
 data

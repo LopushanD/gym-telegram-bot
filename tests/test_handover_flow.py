@@ -132,7 +132,7 @@ class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
             )
 
         change_key_holder.assert_called_once_with(
-            handover_flow.DEFAULT_DATABASE_PATH,
+            handover_flow.DATABASE_PATH,
             1,
             2,
         )

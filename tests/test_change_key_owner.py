@@ -11,7 +11,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import messages
 from src.admin_command_handlers import change_key_owner_command_handler
-from src.config import DEFAULT_DATABASE_PATH
+from src.config import DATABASE_PATH
 from src.database import (
     add_gym_member,
     change_key_holder,
@@ -87,8 +87,8 @@ class ChangeKeyOwnerCommandTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_sets_owner_using_member_id(self):
         await change_key_owner_command_handler(self.update, SimpleNamespace(args=["1", "200"]))
-        self.lookup.assert_called_with(DEFAULT_DATABASE_PATH, 200)
-        self.set_owner.assert_called_once_with(DEFAULT_DATABASE_PATH, 1, self.owner.id)
+        self.lookup.assert_called_with(DATABASE_PATH, 200)
+        self.set_owner.assert_called_once_with(DATABASE_PATH, 1, self.owner.id)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_CHANGE_KEY_OWNER_COMPLETED_TEXT.format(
                 key_id=1, member=self.owner.full_name, telegram_user_id=200,
