@@ -220,41 +220,30 @@ async def update_user_command_handler(update: Update, context) -> None:
         return
 
     try:
-        telegram_user_id, updates = parse_update_user_command_arguments(arguments)
+        member_update = parse_update_user_command_arguments(arguments)
     except UpdateUserUsageError:
         await message.reply_text(messages.ADMIN_UPDATE_USER_USAGE_TEXT)
         return
-    except ValueError:
-        #TODO simply propagate more specific message you got from the parser
+    except ValueError as error:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
-
     member_before = get_gym_member_by_telegram_user_id(
-        DATABASE_PATH,
-        telegram_user_id)
+        DATABASE_PATH,member_update.telegram_user_id)
     if member_before is None:
         await message.reply_text(
             messages.ADMIN_UPDATE_USER_NOT_FOUND_TEXT.format(
-                telegram_user_id=telegram_user_id))
+                telegram_user_id=member_update.telegram_user_id))
         return
-    # TODO check this code, reformat if needed
     member_after = update_gym_member(
-        DATABASE_PATH,
-        telegram_user_id,
-        **updates)
-    if member_after is None:
-        raise RuntimeError("updated gym member could not be loaded")
-
+        DATABASE_PATH,member_update)[0]
     changes = format_gym_member_changes(member_before, member_after)
     if not changes:
         reply = messages.ADMIN_UPDATE_USER_NO_CHANGES_TEXT.format(
-            telegram_user_id=telegram_user_id,
-        )
+            telegram_user_id=member_update.telegram_user_id)
     else:
         reply = messages.ADMIN_UPDATE_USER_COMPLETED_TEXT.format(
-            telegram_user_id=telegram_user_id,
-            changes=changes,
-        )
+            telegram_user_id=member_update.telegram_user_id,
+            changes=changes)
     await message.reply_text(reply)
 
 async def users_command_handler(update: Update, context) -> None:

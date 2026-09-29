@@ -6,6 +6,9 @@
 ---------- SECOND PRIORITY ----------
 - add /deleteuser admin command. It sets deleted_at column to currect timestamp (if the column is not NULL, it means user was deleted)
 - change /keystatus so, that you can see multiple keys (make it similar to /users querry)
+- specify in all commands that having -h parameter calls documentation and ignores all other parameters 
+- standardize the output when you update some table (make it like when you update gym member
+        with /updateuser command)
 - add a logger that will be able to export logs that are sent to docker terminal by telegram (needed for debugging purposes)
 - remove redundant functions from database.py. Leave only the most general ones.
 - commands that write to database should also be logged in a dedicated table.

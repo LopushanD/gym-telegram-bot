@@ -48,7 +48,7 @@ MAILBOX_RECEIVER_TAKEN_TEXT = "Recorded: You are now the holder of key {key_id}.
 MAILBOX_RECEIVER_EMPTY_TEXT = "Key {key_id} is currently recorded as being held not by mailbox, but by someone else. Check 'Key holder info'."
 
 CALLBACK_USER_UNKNOWN_TEXT = "Unknown button. Back to the start."
-ADMIN_BAD_VALUE_TEXT = "Entered value is not valid"
+ADMIN_BAD_VALUE_TEXT = "Entered value is not valid. Command documentation is available with parameter -h"
 ADMIN_COMMAND_FORBIDDEN_TEXT = "Only admins can use this command."
 ADMIN_SET_ADMIN_USAGE_TEXT = "Usage: /setadmin telegram_id True/False"
 ADMIN_SET_ADMIN_BAD_VALUE_TEXT = "Telegram ID must be a positive integer; admin status must be True or False."

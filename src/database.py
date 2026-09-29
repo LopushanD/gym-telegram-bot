@@ -492,10 +492,33 @@ def query_gym_member_records(database_path,querried_member:GymMember) -> list[Gy
         connection.row_factory = sqlite3.Row
         fetched_members = connection.execute(query, parameters).fetchall()
 
-    return [
-        _gym_member_from_row(member)
-        for member in fetched_members
-    ]
+    return [_gym_member_from_row(member) for member in fetched_members]
+
+def update_gym_member(database_path,member:GymMember) -> list[GymMember]:
+    """Update supplied fields and return the updated gym member in a list"""
+    if member.id is not None:
+        raise ValueError("Member id must not be changed!")
+    fields = []
+    parameters = []
+    for k,v in vars(member).items():
+        if v is not None:
+            if k == "telegram_user_id":
+                telegram_user_id = v
+            else:
+                fields.append(k)
+                parameters.append(v)
+    if fields and telegram_user_id is not None:
+        assignments = ", ".join(f"{field} = ?" for field in fields)
+        parameters.append(telegram_user_id)
+        with database_connection(database_path) as connection:
+            connection.execute(
+                f"""
+                UPDATE gym_members
+                SET {assignments}
+                WHERE telegram_user_id = ?
+                """,
+                parameters)
+    return query_gym_member_records(database_path,member)
 
 def add_gym_member(
     database_path,new_user:GymMember) -> None:
@@ -530,54 +553,10 @@ def add_gym_member(
         else:
             raise
         
-#TODO rewrite this function using general function that alters table based on query
 def set_admin(database_path, telegram_user_id: int, is_admin: bool) -> list[GymMember]:
     """Set admin rights and return whether the member exists."""
-    with database_connection(database_path) as connection:
-        connection.execute(
-            "UPDATE gym_members SET is_admin = ? WHERE telegram_user_id = ?",
-            (int(is_admin), telegram_user_id))
-    return query_gym_member_records(database_path,GymMember(telegram_user_id=telegram_user_id))
-
-#TODO rewrite this function using general function that alters table based on query
-def update_gym_member(
-    database_path,
-    telegram_user_id,
-    *,
-    name=None,
-    surname=None,
-    room_number=None,
-    telegram_name=None,
-) -> GymMember | None:
-    """Update supplied fields and return the gym member, or None if absent."""
-    supplied_fields = {
-        "name": name,
-        "surname": surname,
-        "room_number": room_number,
-        "telegram_name": telegram_name,
-    }
-    changes = {
-        field: value
-        for field, value in supplied_fields.items()
-        if value is not None
-    }
-    if not changes:
-        return get_gym_member_by_telegram_user_id(database_path, telegram_user_id)
-
-    assignments = ", ".join(f"{field} = ?" for field in changes)
-    parameters = [*changes.values(), telegram_user_id]
-    with database_connection(database_path) as connection:
-        connection.execute(
-            f"""
-            UPDATE gym_members
-            SET {assignments}
-            WHERE telegram_user_id = ?
-            """,
-            parameters,
-        )
-
-    return get_gym_member_by_telegram_user_id(database_path, telegram_user_id)
-
+    return update_gym_member(database_path,
+        GymMember(telegram_user_id=telegram_user_id,is_admin=is_admin))
 
 def populate_members_table_with_mock_data(database_path,n_members,rng=None):
     """Populate the members table with random plausible mock members."""

@@ -79,37 +79,30 @@ def format_gym_member_changes(
     
 
 def is_help_request(arguments: list[str]) -> bool:
-    return len(arguments) == 1 and arguments[0] in HELP_OPTIONS
+    for argument in arguments:
+        if argument in HELP_OPTIONS:
+            return True
+    return False
 
 class UpdateUserUsageError(ValueError):
     pass
-def parse_update_user_command_arguments(arguments: list[str]) -> tuple[int, dict[str, str | int]]:
+def parse_update_user_command_arguments(arguments: list[str]) -> GymMember:
     if len(arguments) < 3 or len(arguments[1:]) % 2 != 0:
         raise UpdateUserUsageError
-
-    try:
-        telegram_user_id = int(arguments[0])
-    except ValueError as error:
-        raise ValueError("telegram user ID must be an integer") from error
-    if telegram_user_id <= 0:
-        raise ValueError("telegram user ID must be positive")
-
-    updates: dict[str, str | int] = {}
+    telegram_user_id = int(arguments[0])
+    if telegram_user_id <=0:
+        raise ValueError("Telegram ID must be positive")
+    updates: dict[str, str | int] = {"telegram_user_id":telegram_user_id}
     for option, value in zip(arguments[1::2], arguments[2::2]):
         field = GYM_MEMBER_OPTION_FIELDS.get(option)
         if field is None or field in updates or value.startswith("-"):
             raise UpdateUserUsageError
+        if field == "room_number":
+            value = int(value)
+            if value <= 0:
+                raise ValueError(f"{field} must be positive")
         updates[field] = value
-
-    if "room_number" in updates:
-        try:
-            room_number = int(updates["room_number"])
-        except ValueError as error:
-            raise ValueError("room number must be an integer") from error
-        if room_number <= 0:
-            raise ValueError("room number must be positive")
-        updates["room_number"] = room_number
-    return telegram_user_id, updates
+    return GymMember(**updates)
 
 class UserCommandUsageError(ValueError):
     pass
