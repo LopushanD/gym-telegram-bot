@@ -21,7 +21,7 @@ After confirmation, the bot records you as the current holder of that key\.
 
 Use this when another person currently has the desired key\.
 
-1\. Contact the current holder by tapping on their @username to start chat or call them\.
+1\. Contact the current holder by tapping on their `@username` to start chat or call them\.
 2\. Meet the holder and physically receive the key\.
 3\. Ask the holder to press _"Hand key over"_ in their bot menu\.
 4\. In your bot menu, press _"Got key from person"_\.

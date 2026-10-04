@@ -1,6 +1,6 @@
 ---------- FIRST PRIORITY ----------
-- On 4th of october change KEYHOLDERS_NOT_FOUND variable in messages back to it's original value
-- make handover timeout bigger (now it's only 30 sec)
+- got key from mailbox is critically lacking checks. look at the whole procedure and add checks.
+- look at code associated buttons (the whole process). It seems to be clunky, change if needed.
 - make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
         (At least take a look if it's an actual problem)
 ---------- SECOND PRIORITY ----------
