@@ -84,7 +84,7 @@ class ChangeKeyOwnerCommandTests(unittest.IsolatedAsyncioTestCase):
     async def test_reports_missing_key(self):
         self.set_owner.return_value = False
         await change_key_owner_command_handler(self.update, SimpleNamespace(args=["99", "200"]))
-        self.message.reply_text.assert_awaited_once_with(messages.KEY_NOT_FOUND_TEXT.format(key_id=99))
+        self.message.reply_text.assert_awaited_once_with(messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99))
 
     async def test_sets_owner_using_member_id(self):
         await change_key_owner_command_handler(self.update, SimpleNamespace(args=["1", "200"]))

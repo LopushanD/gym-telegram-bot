@@ -101,6 +101,7 @@ async def callback_query_handler(update: Update,context) -> None:
         await handler(query, received_message)
 
 async def handle_key_request(query: CallbackQuery, message: Message) -> None:
+    await query.answer()
     telegram_user_id = query.from_user.id
     member = get_gym_member_by_telegram_user_id(DATABASE_PATH,telegram_user_id)
     if member is None:
@@ -119,10 +120,15 @@ async def handle_key_request(query: CallbackQuery, message: Message) -> None:
 
 async def handle_key_obtained(query: CallbackQuery, message: Message) -> None:
     await query.answer()
-    active_keys = get_active_keys(DATABASE_PATH)
-    await message.edit_text(
-        messages.KEY_CHOICE_PROMPT,
-        reply_markup=build_key_obtained_receiver_key_choice_keyboard(active_keys))
+    requesting_member = get_gym_member_by_telegram_user_id(
+        DATABASE_PATH,telegram_user_id = query.from_user.id)
+    if requesting_member is None:
+        await edit_to_start_state(message,messages.AUTH_USER_UNREGISTERED_TEXT)
+    else:    
+        active_keys = get_active_keys(DATABASE_PATH)
+        await message.edit_text(
+            messages.KEY_CHOICE_PROMPT,
+            reply_markup=build_key_obtained_receiver_key_choice_keyboard(active_keys))
 
 async def handle_key_obtained_choice(query: CallbackQuery, message: Message) -> None:
     await query.answer()
@@ -196,6 +202,7 @@ async def handle_key_return_mailbox_choice(query: CallbackQuery, message: Messag
     )
 
 async def handle_key_return_mailbox_confirmation(query: CallbackQuery,message: Message) -> None:
+    await query.answer()
     telegram_user_id = get_callback_telegram_user_id(query)
     key_id = parse_key_id_callback(
         query.data,
@@ -206,7 +213,6 @@ async def handle_key_return_mailbox_confirmation(query: CallbackQuery,message: M
         reply = messages.MAILBOX_HOLDER_RETURNED_TEXT.format(key_id=key_id)
     else:
         reply = messages.MAILBOX_HOLDER_BLOCKED_TEXT.format(key_id=key_id)
-    await query.answer()
     await edit_to_start_state(message,reply,telegram_user_id)
 
 async def handle_key_return_mailbox_cancellation(query: CallbackQuery,message: Message) -> None:
@@ -216,11 +222,15 @@ async def handle_key_return_mailbox_cancellation(query: CallbackQuery,message: M
 
 async def handle_key_obtained_from_mailbox(query: CallbackQuery,message: Message) -> None:
     await query.answer()
-    active_keys = get_active_keys(DATABASE_PATH)
-    await message.edit_text(
-        messages.KEY_CHOICE_PROMPT,
-        reply_markup=build_key_obtained_mailbox_key_choice_keyboard(active_keys),
-    )
+    requesting_member = get_gym_member_by_telegram_user_id(
+        DATABASE_PATH,telegram_user_id = query.from_user.id)
+    if requesting_member is None:
+        await edit_to_start_state(message,messages.AUTH_USER_UNREGISTERED_TEXT)
+    else:
+        active_keys = get_active_keys(DATABASE_PATH)
+        await message.edit_text(
+            messages.KEY_CHOICE_PROMPT,
+            reply_markup=build_key_obtained_mailbox_key_choice_keyboard(active_keys))
     
 async def handle_key_obtained_from_mailbox_choice(query: CallbackQuery,message: Message) -> None:
     await query.answer()
@@ -236,25 +246,20 @@ async def handle_key_obtained_from_mailbox_choice(query: CallbackQuery,message: 
     )
     
 async def handle_key_obtained_from_mailbox_confirmation(query: CallbackQuery,message: Message) -> None:
+    await query.answer()
     telegram_user_id = get_callback_telegram_user_id(query)
     key_id = parse_key_id_callback(
         query.data,
-        RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX,
-    )
-    mailbox = get_key_owner_mailbox_info(DATABASE_PATH, key_id)
-    #TODO Now message is somewhat confusing. It's the key owner that do not exist.
-    # Change that message after keybox/mailbox becomes part of Gym AG members
-    if mailbox is None:
-        reply = messages.KEY_NOT_FOUND_TEXT
+        RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX)
+    result = take_key_from_mailbox(DATABASE_PATH,telegram_user_id,key_id)
+    if result.status == TakeFromMailboxStatus.TAKEN:
+        reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT.format(key_id=key_id)
+    elif result.status == TakeFromMailboxStatus.KEY_NOT_FOUND:
+        reply = messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id)
+    elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
+        reply = messages.MAILBOX_RECEIVER_EMPTY_TEXT.format(key_id=key_id)
     else:
-        result = take_key_from_mailbox(DATABASE_PATH,telegram_user_id,key_id,mailbox.id)
-        if result.status == TakeFromMailboxStatus.TAKEN:
-            reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT.format(key_id=key_id)
-        elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
-            reply = messages.MAILBOX_RECEIVER_EMPTY_TEXT.format(key_id=key_id)
-        else:
-            reply = messages.AUTH_USER_UNREGISTERED_TEXT
-    await query.answer()
+        reply = messages.AUTH_USER_UNREGISTERED_TEXT
     await edit_to_start_state(message, reply, telegram_user_id)
 
 async def handle_key_obtained_from_mailbox_cancellation(query: CallbackQuery,message: Message) -> None:

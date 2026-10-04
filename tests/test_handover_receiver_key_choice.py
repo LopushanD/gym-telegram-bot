@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import bot, messages
-from src.models import Key
+from src.models import GymMember, Key
 from src.keyboards import (
     RECEIVER_KEY_HANDOVER_CONFIRM_CALLBACK,
     RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX,
@@ -74,11 +74,17 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         query, message = self.make_query()
 
         with (
+            patch.object(
+                bot,
+                "get_gym_member_by_telegram_user_id",
+                return_value=GymMember(id=7, telegram_user_id=123),
+            ) as get_member,
             patch.object(bot, "get_active_keys", return_value=[Key(key_id=1), Key(key_id=4)]) as get_active_keys,
             patch.object(bot, "handle_pending_handover_obtained_backend") as backend,
         ):
             await bot.handle_key_obtained(query, message)
 
+        get_member.assert_called_once_with(bot.DATABASE_PATH, telegram_user_id=123)
         get_active_keys.assert_called_once_with(bot.DATABASE_PATH)
         backend.assert_not_called()
         query.answer.assert_awaited_once_with()
@@ -90,6 +96,23 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("1", keyboard[0][0].text)
         self.assertEqual("4", keyboard[1][0].text)
         self.assertEqual("Cancel", keyboard[2][0].text)
+
+    async def test_first_click_rejects_unregistered_user_before_showing_keys(self):
+        query, message = self.make_query()
+
+        with (
+            patch.object(bot, "get_gym_member_by_telegram_user_id", return_value=None),
+            patch.object(bot, "get_active_keys") as get_active_keys,
+            patch.object(bot, "edit_to_start_state", new_callable=AsyncMock) as edit_to_start_state,
+        ):
+            await bot.handle_key_obtained(query, message)
+
+        query.answer.assert_awaited_once_with()
+        edit_to_start_state.assert_awaited_once_with(
+            message, messages.AUTH_USER_UNREGISTERED_TEXT
+        )
+        message.edit_text.assert_not_awaited()
+        get_active_keys.assert_not_called()
 
     async def test_key_choice_uses_selected_key_for_handover_lookup(self):
         query, message = self.make_query(

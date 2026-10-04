@@ -171,6 +171,17 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         )
         query.answer.assert_awaited_once_with()
 
+    async def test_confirmation_answers_callback_before_database_failure(self):
+        query, message = self.make_query(
+            f"{HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK_PREFIX}:2",
+        )
+        with patch.object(bot, "return_key_to_mailbox", side_effect=RuntimeError("database error")):
+            with self.assertRaisesRegex(RuntimeError, "database error"):
+                await bot.handle_key_return_mailbox_confirmation(query, message)
+
+        query.answer.assert_awaited_once_with()
+        message.edit_text.assert_not_awaited()
+
 
 if __name__ == "__main__":
     unittest.main()

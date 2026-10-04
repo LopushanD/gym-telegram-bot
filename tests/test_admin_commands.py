@@ -241,7 +241,7 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_FOUND_TEXT.format(key_id=999),
+            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=999),
         )
 
     async def test_gives_key_and_reports_target_member(self):
@@ -929,7 +929,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
 
         get_status.assert_called_once_with(DATABASE_PATH, 99)
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
+            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99),
         )
 
     async def test_replies_with_complete_key_status(self):
@@ -1003,7 +1003,7 @@ class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
 
         set_active.assert_called_once_with(DATABASE_PATH, 99, True)
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
+            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99),
         )
 
     async def test_activate_sets_key_active(self):

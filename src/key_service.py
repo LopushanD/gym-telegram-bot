@@ -5,6 +5,7 @@ from src.config import DATABASE_PATH
 from src.models import GymMember, KeyHolder
 from src.database import (
     change_key_holder,
+    get_key_status,
     get_current_keyholder_info,
     get_all_current_keyholders_info,
     get_key_return_instruction_info,
@@ -33,6 +34,7 @@ class TakeFromMailboxStatus(Enum):
     KEY_NOT_IN_MAILBOX = "key_not_in_mailbox"
     MISSING_TELEGRAM_USER = "missing_telegram_user"
     USER_NOT_REGISTERED = "user_not_registered"
+    KEY_NOT_FOUND = "key_not_found"
 
 
 class GiveKeyStatus(Enum):
@@ -103,16 +105,17 @@ def return_key_to_mailbox(database_path,telegram_user_id,key_id):
         return ReturnToMailboxResult(status=ReturnToMailboxStatus.RETURNED)
     return ReturnToMailboxResult(status=ReturnToMailboxStatus.NOT_CURRENT_HOLDER)
 
-#TODO: no active key check -> old buttons can change key holder even if key is inactive
-def take_key_from_mailbox(database_path,telegram_user_id,key_id,mailbox_member_id):
-    current_key_holder = get_current_keyholder_info(database_path,key_id,gym_member_id=mailbox_member_id)
-    if current_key_holder is None:
-        return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX)
+def take_key_from_mailbox(database_path,telegram_user_id,key_id):
     if telegram_user_id is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.MISSING_TELEGRAM_USER)
     member_id = get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id)
     if member_id is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.USER_NOT_REGISTERED)
+    key,current_key_holder,key_owner = get_key_status(database_path,key_id)
+    if key is None or not key.is_active:
+        return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_FOUND)
+    elif current_key_holder != key_owner: # now owner is always a mailbox
+        return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX)
     change_key_holder(database_path, key_id, member_id)
     return TakeFromMailboxResult(status=TakeFromMailboxStatus.TAKEN)
 

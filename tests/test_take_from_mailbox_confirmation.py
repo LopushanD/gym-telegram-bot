@@ -48,11 +48,17 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         query, message = self.make_query()
 
         with (
+            patch.object(
+                bot,
+                "get_gym_member_by_telegram_user_id",
+                return_value=GymMember(id=7, telegram_user_id=123),
+            ) as get_member,
             patch.object(bot, "get_active_keys", return_value=[Key(key_id=1), Key(key_id=4)]) as get_active_keys,
             patch.object(bot, "take_key_from_mailbox") as take_key_from_mailbox,
         ):
             await bot.handle_key_obtained_from_mailbox(query, message)
 
+        get_member.assert_called_once_with(bot.DATABASE_PATH, telegram_user_id=123)
         get_active_keys.assert_called_once_with(bot.DATABASE_PATH)
         take_key_from_mailbox.assert_not_called()
         query.answer.assert_awaited_once_with()
@@ -64,6 +70,23 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("1", keyboard[0][0].text)
         self.assertEqual("4", keyboard[1][0].text)
         self.assertEqual("Cancel", keyboard[2][0].text)
+
+    async def test_first_click_rejects_unregistered_user_before_showing_keys(self):
+        query, message = self.make_query()
+
+        with (
+            patch.object(bot, "get_gym_member_by_telegram_user_id", return_value=None),
+            patch.object(bot, "get_active_keys") as get_active_keys,
+            patch.object(bot, "edit_to_start_state", new_callable=AsyncMock) as edit_to_start_state,
+        ):
+            await bot.handle_key_obtained_from_mailbox(query, message)
+
+        query.answer.assert_awaited_once_with()
+        edit_to_start_state.assert_awaited_once_with(
+            message, messages.AUTH_USER_UNREGISTERED_TEXT
+        )
+        message.edit_text.assert_not_awaited()
+        get_active_keys.assert_not_called()
 
     async def test_take_from_mailbox_key_choice_asks_for_confirmation(self):
         query, message = self.make_query(
@@ -114,7 +137,6 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         handler.assert_awaited_once_with(query, message)
 
     async def test_take_from_mailbox_confirm_updates_holder(self):
-        mailbox_member_id = 1
         query, message = self.make_query(
             f"{RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX}:2",
         )
@@ -124,27 +146,68 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
             "take_key_from_mailbox",
             return_value=TakeFromMailboxResult(status=TakeFromMailboxStatus.TAKEN),
         ) as take_key_from_mailbox, patch.object(
-            bot,
-            "get_key_owner_mailbox_info",
-            return_value=GymMember(
-                id=mailbox_member_id,
-                telegram_user_id=0,
-                name="Mailbox",
-                surname="Owner",
-                room_number=1234,
-                telegram_name=None,
-                is_admin=False,
-            ),
-        ), patch.object(bot, "edit_to_start_state", new_callable=AsyncMock):
+            bot, "edit_to_start_state", new_callable=AsyncMock
+        ) as edit_to_start_state:
             await bot.handle_key_obtained_from_mailbox_confirmation(query, message)
 
         take_key_from_mailbox.assert_called_once_with(
             bot.DATABASE_PATH,
             123,
             2,
-            mailbox_member_id,
         )
         query.answer.assert_awaited_once_with()
+        edit_to_start_state.assert_awaited_once_with(
+            message, messages.MAILBOX_RECEIVER_TAKEN_TEXT.format(key_id=2), 123
+        )
+
+    async def test_take_from_mailbox_confirm_reports_missing_key(self):
+        query, message = self.make_query(
+            f"{RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX}:99",
+        )
+
+        with patch.object(
+            bot,
+            "take_key_from_mailbox",
+            return_value=TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_FOUND),
+        ), patch.object(
+            bot, "edit_to_start_state", new_callable=AsyncMock
+        ) as edit_to_start_state:
+            await bot.handle_key_obtained_from_mailbox_confirmation(query, message)
+
+        query.answer.assert_awaited_once_with()
+        edit_to_start_state.assert_awaited_once_with(
+            message, messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99), 123
+        )
+
+    async def test_take_from_mailbox_confirm_reports_key_held_by_someone_else(self):
+        query, message = self.make_query(
+            f"{RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX}:2",
+        )
+
+        with patch.object(
+            bot,
+            "take_key_from_mailbox",
+            return_value=TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX),
+        ), patch.object(
+            bot, "edit_to_start_state", new_callable=AsyncMock
+        ) as edit_to_start_state:
+            await bot.handle_key_obtained_from_mailbox_confirmation(query, message)
+
+        query.answer.assert_awaited_once_with()
+        edit_to_start_state.assert_awaited_once_with(
+            message, messages.MAILBOX_RECEIVER_EMPTY_TEXT.format(key_id=2), 123
+        )
+
+    async def test_confirmation_answers_callback_before_database_failure(self):
+        query, message = self.make_query(
+            f"{RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX}:2",
+        )
+        with patch.object(bot, "take_key_from_mailbox", side_effect=RuntimeError("database error")):
+            with self.assertRaisesRegex(RuntimeError, "database error"):
+                await bot.handle_key_obtained_from_mailbox_confirmation(query, message)
+
+        query.answer.assert_awaited_once_with()
+        message.edit_text.assert_not_awaited()
 
 
 if __name__ == "__main__":
