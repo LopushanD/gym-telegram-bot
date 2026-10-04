@@ -35,10 +35,11 @@ from src.admin_command_handlers import (
     update_user_command_handler,
     users_command_handler,
 )
+from src.command_handlers_utility import process_key_history_records
 from src.config import DATABASE_PATH
 from src.database import GymMemberAlreadyExistsError
 from src.key_service import GiveKeyResult, GiveKeyStatus
-from src.models import GymMember, KeyHistoryRecord, KeyStatus
+from src.models import GymMember, KeyHistoryRecord, Key
 
 
 def build_member(telegram_user_id: int, *, is_admin: bool = False) -> GymMember:
@@ -390,11 +391,7 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
 
         add_member.assert_called_once_with(
             DATABASE_PATH,
-            telegram_user_id=200,
-            name="Ada",
-            surname="Lovelace",
-            room_number=1234,
-            telegram_name="@ada",
+            GymMember(telegram_user_id=200, name="Ada", surname="Lovelace", room_number=1234, telegram_name="@ada"),
         )
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_ADD_USER_COMPLETED_TEXT.format(
@@ -425,18 +422,12 @@ class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class UpdateUserArgumentTests(unittest.TestCase):
     def test_parses_options_in_any_order(self):
-        telegram_user_id, updates = parse_update_user_command_arguments(
+        member = parse_update_user_command_arguments(
             ["200", "-t", "@ada", "--room", "4321", "-n", "Ada"]
         )
-
-        self.assertEqual(200, telegram_user_id)
         self.assertEqual(
-            {
-                "telegram_name": "@ada",
-                "room_number": 4321,
-                "name": "Ada",
-            },
-            updates,
+            GymMember(telegram_user_id=200, telegram_name="@ada", room_number=4321, name="Ada"),
+            member,
         )
 
     def test_rejects_unknown_duplicate_and_missing_options(self):
@@ -580,7 +571,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch(
                 "src.admin_command_handlers.update_gym_member",
-                return_value=member_after,
+                return_value=[member_after],
             ) as update_member,
         ):
             await update_user_command_handler(
@@ -592,9 +583,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
 
         update_member.assert_called_once_with(
             DATABASE_PATH,
-            200,
-            name="Ada",
-            room_number=4321,
+            GymMember(telegram_user_id=200, name="Ada", room_number=4321),
         )
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_UPDATE_USER_COMPLETED_TEXT.format(
@@ -617,7 +606,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch(
                 "src.admin_command_handlers.update_gym_member",
-                return_value=target_member,
+                return_value=[target_member],
             ) as update_member,
         ):
             await update_user_command_handler(
@@ -627,8 +616,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
 
         update_member.assert_called_once_with(
             DATABASE_PATH,
-            200,
-            name="Dima",
+            GymMember(telegram_user_id=200, name="Dima"),
         )
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_UPDATE_USER_NO_CHANGES_TEXT.format(telegram_user_id=200),
@@ -829,7 +817,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
 
         get_history.assert_called_once_with(DATABASE_PATH, 2, 5)
         self.message.reply_text.assert_awaited_once_with(
-            messages.key_history_record_text(record),
+            process_key_history_records([record], "\n")[0],
         )
 
     async def test_filters_by_requested_key_with_default_limit(self):
@@ -935,7 +923,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
                 "src.admin_command_handlers.get_gym_member_by_telegram_user_id",
                 return_value=build_member(100, is_admin=True),
             ),
-            patch("src.admin_command_handlers.get_key_status", return_value=None) as get_status,
+            patch("src.admin_command_handlers.get_key_status", return_value=(None, None, None)) as get_status,
         ):
             await key_status_command_handler(self.update, SimpleNamespace(args=["99"]))
 
@@ -945,10 +933,10 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_replies_with_complete_key_status(self):
-        status = KeyStatus(
+        status = Key(
             key_id=1,
-            current_holder=build_member(200),
-            owner=GymMember(20, 300, "Key", "Mailbox", 4321, None, False),
+            current_holder_id=build_member(200).id,
+            owner_member_id=20,
             is_active=True,
         )
         with (
@@ -956,12 +944,12 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
                 "src.admin_command_handlers.get_gym_member_by_telegram_user_id",
                 return_value=build_member(100, is_admin=True),
             ),
-            patch("src.admin_command_handlers.get_key_status", return_value=status),
+            patch("src.admin_command_handlers.get_key_status", return_value=(status, build_member(200), GymMember(20, 300, "Key", "Mailbox", 4321, None, False))),
         ):
             await key_status_command_handler(self.update, SimpleNamespace(args=["1"]))
 
         self.message.reply_text.assert_awaited_once_with(
-            messages.key_status_text(status),
+            messages.key_status_text(status, build_member(200), GymMember(20, 300, "Key", "Mailbox", 4321, None, False)),
         )
 
 

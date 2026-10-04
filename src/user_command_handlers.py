@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 import asyncio
 from src.bot_replies import reply_with_start_state
 from src import messages
-from src.config import DATABASE_PATH
+from src.config import DATABASE_PATH,gym_member_record_separator
 from src.telegram_helpers import get_update_telegram_user_id
 from src.database import query_gym_member_records
 from src.command_handlers_utility import process_gym_member_records
@@ -54,8 +54,7 @@ async def show_admins_command_handler(update: Update, context:ContextTypes.DEFAU
     message = update.effective_message
     members = query_gym_member_records(DATABASE_PATH,GymMember(is_admin=True))
     if members:
-        separator = "\n"+"-"*10+"\n"
-        for reply in process_gym_member_records(members,separator):
+        for reply in process_gym_member_records(members,gym_member_record_separator):
             await message.reply_text(reply)
     else:
         await message.reply_text(messages.USER_COMMAND_ADMINS_NOT_FOUND_TEXT)

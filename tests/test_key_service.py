@@ -13,7 +13,6 @@ from src.key_service import (
     KeyReturnInstruction,
     give_key_to_member,
     get_keyholders,
-    get_tracked_key_count,
     get_key_return_instruction,
     can_start_key_handover,
     user_currently_holds_key,
@@ -65,13 +64,6 @@ class KeyServiceTests(unittest.TestCase):
 
         self.assertIsNone(holder)
 
-    def test_get_tracked_key_count_returns_database_key_count(self):
-        with patch("src.key_service.get_key_count", return_value=2) as get_key_count:
-            key_count = get_tracked_key_count("database.sqlite3")
-
-        self.assertEqual(2, key_count)
-        get_key_count.assert_called_once_with("database.sqlite3")
-
     def test_get_key_return_instruction_returns_held_key_and_mailbox_room(self):
         with patch(
             "src.key_service.get_key_return_instruction_info",
@@ -117,7 +109,7 @@ class KeyServiceTests(unittest.TestCase):
         get_current_keyholder_info.assert_called_once_with(
             "database.sqlite3",
             1,
-            telegram_user_id=123,
+            123,
         )
 
     def test_user_currently_holds_key_returns_false_without_telegram_id(self):

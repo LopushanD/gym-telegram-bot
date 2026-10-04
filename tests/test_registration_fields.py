@@ -1,3 +1,4 @@
+from contextlib import closing
 import sqlite3
 import tempfile
 import unittest
@@ -23,7 +24,7 @@ class RegistrationDatabaseFieldTests(unittest.TestCase):
 
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info(gym_members)")
@@ -35,7 +36,7 @@ class RegistrationDatabaseFieldTests(unittest.TestCase):
     def test_initialization_discards_legacy_phone_data_and_preserves_keys(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 connection.executescript(
                     """
                     CREATE TABLE gym_members (
@@ -69,7 +70,7 @@ class RegistrationDatabaseFieldTests(unittest.TestCase):
 
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info(gym_members)")
@@ -90,30 +91,17 @@ class RegistrationDatabaseFieldTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            for telegram_name in (None, "", "   "):
+            for telegram_user_id, telegram_name in enumerate((None, "", "   "), start=200):
                 with self.subTest(telegram_name=telegram_name):
                     with self.assertRaisesRegex(
                         ValueError,
                         "telegram name is required",
                     ):
-                        add_gym_member(
-                            database_path,
-                            telegram_user_id=123,
-                            name="Ada",
-                            surname="Lovelace",
-                            room_number=1204,
-                            telegram_name=telegram_name,
-                        )
+                        add_gym_member(database_path, GymMember(telegram_user_id=telegram_user_id, name="Ada", surname="Lovelace", room_number=1204, telegram_name=telegram_name))
 
-            member = add_gym_member(
-                database_path,
-                telegram_user_id=123,
-                name="Ada",
-                surname="Lovelace",
-                room_number=1204,
-                telegram_name="@ada",
-            )
+            add_gym_member(database_path, GymMember(telegram_user_id=123, name="Ada", surname="Lovelace", room_number=1204, telegram_name="@ada"))
 
+            member = get_gym_member_by_telegram_user_id(database_path, 123)
             self.assertEqual("@ada", member.telegram_name)
             self.assertFalse(hasattr(member, "phone_number"))
             self.assertEqual(

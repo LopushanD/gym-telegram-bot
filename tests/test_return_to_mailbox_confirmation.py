@@ -12,7 +12,6 @@ from src.key_service import KeyReturnInstruction
 from src.key_service import ReturnToMailboxResult, ReturnToMailboxStatus
 from src.keyboards import (
     HOLDER_KEY_RETURN_MAILBOX_CANCEL_CALLBACK,
-    HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK,
     HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK_PREFIX,
     HOLDER_KEY_RETURN_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX,
     build_key_return_mailbox_confirmation_keyboard,
@@ -36,7 +35,7 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual("Confirm", keyboard[0][0].text)
         self.assertEqual(
-            f"{HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK}:2",
+            f"{HOLDER_KEY_RETURN_MAILBOX_CONFIRM_CALLBACK_PREFIX}:2",
             keyboard[0][0].callback_data,
         )
         self.assertEqual("Cancel", keyboard[0][1].text)
@@ -51,7 +50,7 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         rows = keyboard.inline_keyboard
 
         self.assertEqual(2, len(rows))
-        self.assertEqual("Returned", rows[0][0].text)
+        self.assertEqual("Key returned", rows[0][0].text)
         self.assertEqual(
             f"{HOLDER_KEY_RETURN_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX}:2",
             rows[0][0].callback_data,
@@ -88,7 +87,7 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("reply_markup", kwargs)
         keyboard = kwargs["reply_markup"].inline_keyboard
-        self.assertEqual("Returned", keyboard[0][0].text)
+        self.assertEqual("Key returned", keyboard[0][0].text)
         self.assertEqual("Cancel", keyboard[1][0].text)
 
     async def test_return_to_mailbox_first_click_blocks_without_return_instruction(self):

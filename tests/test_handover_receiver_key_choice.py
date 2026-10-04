@@ -8,6 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import bot, messages
+from src.models import Key
 from src.keyboards import (
     RECEIVER_KEY_HANDOVER_CONFIRM_CALLBACK,
     RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX,
@@ -29,7 +30,7 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         return query, message
 
     def test_key_choice_keyboard_has_one_button_per_tracked_key(self):
-        keyboard = build_key_obtained_receiver_key_choice_keyboard(3)
+        keyboard = build_key_obtained_receiver_key_choice_keyboard([Key(key_id=1), Key(key_id=4), Key(key_id=9)])
 
         rows = keyboard.inline_keyboard
 
@@ -39,14 +40,14 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
             f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:1",
             rows[0][0].callback_data,
         )
-        self.assertEqual("2", rows[1][0].text)
+        self.assertEqual("4", rows[1][0].text)
         self.assertEqual(
-            f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:2",
+            f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:4",
             rows[1][0].callback_data,
         )
-        self.assertEqual("3", rows[2][0].text)
+        self.assertEqual("9", rows[2][0].text)
         self.assertEqual(
-            f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:3",
+            f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:9",
             rows[2][0].callback_data,
         )
         self.assertEqual("Cancel", rows[3][0].text)
@@ -73,12 +74,12 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         query, message = self.make_query()
 
         with (
-            patch.object(bot, "get_key_count", return_value=2) as get_key_count,
+            patch.object(bot, "get_active_keys", return_value=[Key(key_id=1), Key(key_id=4)]) as get_active_keys,
             patch.object(bot, "handle_pending_handover_obtained_backend") as backend,
         ):
             await bot.handle_key_obtained(query, message)
 
-        get_key_count.assert_called_once_with(bot.DATABASE_PATH)
+        get_active_keys.assert_called_once_with(bot.DATABASE_PATH)
         backend.assert_not_called()
         query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
@@ -87,7 +88,7 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("reply_markup", kwargs)
         keyboard = kwargs["reply_markup"].inline_keyboard
         self.assertEqual("1", keyboard[0][0].text)
-        self.assertEqual("2", keyboard[1][0].text)
+        self.assertEqual("4", keyboard[1][0].text)
         self.assertEqual("Cancel", keyboard[2][0].text)
 
     async def test_key_choice_uses_selected_key_for_handover_lookup(self):

@@ -15,7 +15,8 @@ class ReturnToMailboxKeyboardTests(unittest.TestCase):
     def test_holder_start_keyboard_has_return_to_mailbox_callback(self):
         keyboard = build_start_keyboard(include_holder_actions=True)
 
-        return_button = keyboard.inline_keyboard[1][0]
+        return_button = next(button for row in keyboard.inline_keyboard for button in row
+                             if button.callback_data == HOLDER_KEY_RETURN_MAILBOX_CALLBACK)
 
         self.assertEqual("Return key to mailbox", return_button.text)
         self.assertEqual(

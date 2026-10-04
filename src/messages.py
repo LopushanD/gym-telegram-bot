@@ -1,5 +1,6 @@
-from src.config import HANDOVER_WINDOW_SECONDS,TELEGRAM_CONTACT_NAME
-from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
+from src.config import HANDOVER_WINDOW_SECONDS,TELEGRAM_CONTACT_NAME,gym_member_record_separator
+from src.models import GymMember, KeyHistoryRecord, KeyHolder, Key
+from src.command_handlers_utility import process_gym_member_records
 from src.user_commands import TUTORIALS_INFO_TUTORIAL,SHOW_ADMINS_USER_COMMAND
 
 UNKNOWN_EXCEPTION = "Unknown error occured."
@@ -97,27 +98,11 @@ def current_key_holder_text(holder: KeyHolder) -> str:
         text += f"\nTelegram name: {telegram_name}"
     return text
 
-# TODO I think it's better to get rid of this function and make local
-# functions that format records as needed  
-def gym_member_record_text(member: GymMember) -> str:
-    return " ".join(
+def key_status_text(key: Key,holder:GymMember,owner:GymMember) -> str:
+    return gym_member_record_separator.join(
         (
-            f"ID: {member.id}",
-            f"Telegram ID: {member.telegram_user_id}",
-            f"Name: {member.name}",
-            f"Surname: {member.surname}",
-            f"Room: {member.room_number}",
-            f"Telegram name: {member.telegram_name or 'None'}",
-            f"Admin: {'yes' if member.is_admin else 'no'}",
-        )
-    )
-# TODO just like function above, think about moving such procesing functions to command_handlers_utility.py file
-# or creating dedicated file formatting functions 
-def key_status_text(status: KeyStatus) -> str:
-    return "\n".join(
-        (
-            f"Key ID: {status.key_id}\nActive: {'yes' if status.is_active else 'no'}",
-            f"Current holder:\n{gym_member_record_text(status.current_holder)}",
-            f"Owner:\n{gym_member_record_text(status.owner)}",
+            f"Key ID: {key.key_id}\nActive: {'yes' if key.is_active else 'no'}",
+            f"Current holder\n\n{process_gym_member_records([holder],gym_member_record_separator,True,True,True)[0]}",
+            f"Owner\n\n{process_gym_member_records([owner],gym_member_record_separator,True,True,True)[0]}"
         )
     )

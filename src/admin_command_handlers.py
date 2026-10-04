@@ -1,6 +1,6 @@
 from telegram import Update
 from src import messages
-from src.config import DATABASE_PATH,LAST_N_RECORDS_DEFAULT
+from src.config import DATABASE_PATH,LAST_N_RECORDS_DEFAULT,gym_member_record_separator
 from src.admin_commands import *
 from src.command_handlers_utility import *
 from src.database import (
@@ -263,8 +263,7 @@ async def users_command_handler(update: Update, context) -> None:
             surname=gym_member_dict["surname"],
             room_number=gym_member_dict["room_number"]))
         if members:
-            separator = "\n"+"-"*10+"\n"
-            for reply in process_gym_member_records(members,separator,showTechnicalIDs=True,showMemberStatus=True,showAdminStatus=True):
+            for reply in process_gym_member_records(members,gym_member_record_separator,showTechnicalIDs=True,showMemberStatus=True,showAdminStatus=True):
                 await message.reply_text(reply)
         else:
             await message.reply_text(messages.ADMIN_USERS_NOT_FOUND_TEXT)
@@ -325,17 +324,15 @@ async def key_status_command_handler(update: Update, context) -> None:
     if key_id <= 0:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
-    # TODO make key status message more readable. Add something like process_key_status_records
-    # even better is to try to make more abstract parent record processor and more specific
-    # processors as it's children
-    status = get_key_status(DATABASE_PATH, key_id)
-    if status is None:
+    key,holder,owner = get_key_status(DATABASE_PATH, key_id)
+    if key is None:
         await message.reply_text(
-            messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id),
-        )
+            messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id))
         return
-
-    await message.reply_text(messages.key_status_text(status))
+    elif holder is None or owner is None:
+        await message.reply_text(f"Current holder or owner of the key were not found. It shouldn't be like that. Please, report the situation to admins.")
+        return
+    await message.reply_text(messages.key_status_text(key,holder,owner))
 
 async def set_key_active_command_handler(
     update: Update,

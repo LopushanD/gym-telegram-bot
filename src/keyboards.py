@@ -1,5 +1,5 @@
 from typing import Final
-
+from src.models import Key
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message
 GET_STARTING_MESSAGE_CALLBACK: Final[str] = "starting_message"
 RECEIVER_KEY_INFO_CALLBACK: Final[str] = "receiver_key_info"
@@ -111,15 +111,15 @@ def build_key_obtained_receiver_confirmation_keyboard(key_id: int) -> InlineKeyb
     return InlineKeyboardMarkup(keyboard)
 
 
-def build_key_obtained_receiver_key_choice_keyboard(key_count: int) -> InlineKeyboardMarkup:
+def build_key_obtained_receiver_key_choice_keyboard(keys: list[Key]) -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton(
-                str(key_id),
-                callback_data=handover_key_choice_callback(key_id),
+                str(key.key_id),
+                callback_data=handover_key_choice_callback(key.key_id),
             )
         ]
-        for key_id in range(1, key_count + 1)
+        for key in keys
     ]
     keyboard.append(
         [
@@ -173,18 +173,15 @@ def build_key_obtained_mailbox_confirmation_keyboard(key_id: int) -> InlineKeybo
     return InlineKeyboardMarkup(keyboard)
 
 
-def build_key_obtained_mailbox_key_choice_keyboard(
-    #TODO: make sure IDs are always consisted with IDs in database
-    key_count: int,
-) -> InlineKeyboardMarkup:
+def build_key_obtained_mailbox_key_choice_keyboard(keys: list[Key]) -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton(
-                str(key_id),
-                callback_data=mailbox_key_choice_callback(key_id),
+                str(key.key_id),
+                callback_data=mailbox_key_choice_callback(key.key_id),
             )
         ]
-        for key_id in range(1, key_count + 1)
+        for key in keys
     ]
     keyboard.append(
         [

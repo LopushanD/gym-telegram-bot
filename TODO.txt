@@ -1,8 +1,6 @@
 ---------- FIRST PRIORITY ----------
 - got key from mailbox is critically lacking checks. look at the whole procedure and add checks.
 - look at code associated buttons (the whole process). It seems to be clunky, change if needed.
-- make key IDs representing  more reliable in build_key_obtained_mailbox_key_choice_keyboard (take them from database)
-        (At least take a look if it's an actual problem)
 ---------- SECOND PRIORITY ----------
 - add /deleteuser admin command. It sets deleted_at column to currect timestamp (if the column is not NULL, it means user was deleted)
 - change /keystatus so, that you can see multiple keys (make it similar to /users querry)

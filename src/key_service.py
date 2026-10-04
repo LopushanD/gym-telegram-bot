@@ -7,7 +7,6 @@ from src.database import (
     change_key_holder,
     get_current_keyholder_info,
     get_all_current_keyholders_info,
-    get_key_count,
     get_key_return_instruction_info,
     get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
@@ -69,10 +68,6 @@ def get_keyholders(database_path)-> list[KeyHolder]:
         return None
     return holders
 
-
-def get_tracked_key_count(database_path) -> int:
-    return get_key_count(database_path)
-
 def get_key_return_instruction(database_path, telegram_user_id):
     if telegram_user_id is None:
         return None
@@ -103,15 +98,15 @@ def can_start_key_handover(database_path, telegram_user_id, key_id):
 
 def return_key_to_mailbox(database_path,telegram_user_id,key_id):
     if user_currently_holds_key(database_path, telegram_user_id, key_id):
-        mailbox = get_key_owner_mailbox_info(DATABASE_PATH, key_id)
+        mailbox = get_key_owner_mailbox_info(database_path, key_id)
         change_key_holder(database_path, key_id, mailbox.id)
         return ReturnToMailboxResult(status=ReturnToMailboxStatus.RETURNED)
     return ReturnToMailboxResult(status=ReturnToMailboxStatus.NOT_CURRENT_HOLDER)
 
-
+#TODO: no active key check -> old buttons can change key holder even if key is inactive
 def take_key_from_mailbox(database_path,telegram_user_id,key_id,mailbox_member_id):
-    if get_current_keyholder_info(database_path,key_id,
-        gym_member_id=mailbox_member_id) is None:
+    current_key_holder = get_current_keyholder_info(database_path,key_id,gym_member_id=mailbox_member_id)
+    if current_key_holder is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX)
     if telegram_user_id is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.MISSING_TELEGRAM_USER)

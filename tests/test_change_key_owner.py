@@ -18,6 +18,7 @@ from src.database import (
     database_connection,
     get_key_history,
     get_key_status,
+    get_gym_member_by_telegram_user_id,
     initialize_database,
     set_key_owner,
 )
@@ -101,12 +102,10 @@ class SetKeyOwnerTests(unittest.TestCase):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         self.database_path = Path(directory) / "test.sqlite3"
         initialize_database(self.database_path)
-        self.holder = add_gym_member(
-            self.database_path, 100, "Current", "Holder", 1234, "@holder",
-        )
-        self.owner = add_gym_member(
-            self.database_path, 200, "New", "Owner", 4321, "@owner",
-        )
+        add_gym_member(self.database_path, GymMember(telegram_user_id=100, name="Current", surname="Holder", room_number=1234, telegram_name="@holder"))
+        add_gym_member(self.database_path, GymMember(telegram_user_id=200, name="New", surname="Owner", room_number=4321, telegram_name="@owner"))
+        self.holder = get_gym_member_by_telegram_user_id(self.database_path, 100)
+        self.owner = get_gym_member_by_telegram_user_id(self.database_path, 200)
         with database_connection(self.database_path) as connection:
             cursor = connection.execute(
                 "INSERT INTO keys (current_holder_id, owner_member_id, is_active) VALUES (?, ?, 0)",
@@ -118,9 +117,11 @@ class SetKeyOwnerTests(unittest.TestCase):
     def test_changes_only_owner_and_preserves_holder_history(self):
         history = get_key_history(self.database_path, self.key_id)
         self.assertTrue(set_key_owner(self.database_path, self.key_id, self.owner.id))
-        status = get_key_status(self.database_path, self.key_id)
-        self.assertEqual(status.owner, self.owner)
-        self.assertEqual(status.current_holder, self.holder)
+        status, holder, owner = get_key_status(self.database_path, self.key_id)
+        self.assertEqual(status.owner_member_id, self.owner.id)
+        self.assertEqual(owner, self.owner)
+        self.assertEqual(status.current_holder_id, self.holder.id)
+        self.assertEqual(holder, self.holder)
         self.assertFalse(status.is_active)
         self.assertEqual(get_key_history(self.database_path, self.key_id), history)
 

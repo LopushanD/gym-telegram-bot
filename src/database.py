@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.models import GymMember, KeyHistoryRecord, KeyHolder, KeyStatus
+from src.models import GymMember, KeyHistoryRecord, KeyHolder, Key
 from src.config import DATABASE_PATH
 
 
@@ -24,7 +24,6 @@ def database_connection(database_path) -> Iterator[sqlite3.Connection]:
 
 class GymMemberAlreadyExistsError(ValueError):
     pass
-# TODO look at the 'prefix' parameter. It does not seem to be doing anything
 def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember:
     member = GymMember(
         id=row["member_id"] if prefix is None else row[f"{prefix}_member_id"],
@@ -37,6 +36,15 @@ def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember
         suspended_until=row["suspended_until"]if prefix is None else row[f"{prefix}_suspended_until"],
         deleted_at=row["deleted_at"] if prefix is None else row[f"{prefix}_deleted_at"])
     return member
+
+def _key_from_row(row: sqlite3.Row, prefix: str|None = None) -> Key:
+    key = Key(
+        key_id=row["key_id"] if prefix is None else row[f"{prefix}_key_id"],
+    current_holder_id=row["current_holder_id"] if prefix is None else row[f"{prefix}_current_holder_id"],
+    owner_member_id=row["owner_id"] if prefix is None else row[f"{prefix}_owner_id"],
+    is_active=row["is_active"] if prefix is None else row[f"{prefix}_is_active"]
+    )
+    return key
 
 FIRST_NAMES = (
     "Alex",
@@ -312,21 +320,13 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
     ]
 
 
-def get_key_count(database_path):
-    """Return the number of tracked keys."""
-    with database_connection(database_path) as connection:
-        connection.execute("PRAGMA foreign_keys = ON")
-        row = connection.execute(
-            """
-            SELECT COUNT(*)
-            FROM keys
-            """
-        ).fetchone()
-    return row[0]
+def get_active_keys(database_path)-> list[Key]:
+    """Return active keys."""
+    return query_key_table(database_path,Key(is_active=True))
 
-
-def get_key_status(database_path, key_id: int) -> KeyStatus | None:
-    """Return complete status information for one key, or None if absent."""
+#TODO update this code
+def get_key_status(database_path, key_id: int) -> tuple[Key,GymMember,GymMember] | tuple[None,None,None]:
+    """Return complete status information as a triple (key,current holder,owner) or None if key is not found"""
     query = """
         SELECT
             keys.id AS key_id,
@@ -359,14 +359,16 @@ def get_key_status(database_path, key_id: int) -> KeyStatus | None:
         row = connection.execute(query, (key_id,)).fetchone()
 
     if row is None:
-        return None
+        return (None,None,None)
 
-    return KeyStatus(
+    key = Key(
         key_id=row["key_id"],
-        current_holder=_gym_member_from_row(row, "holder"),
-        owner=_gym_member_from_row(row, "owner"),
-        is_active=bool(row["is_active"]),
-    )
+        current_holder_id=row["holder_member_id"],
+        owner_member_id=row["owner_member_id"],
+        is_active=bool(row["is_active"]))
+    holder = _gym_member_from_row(row,"holder")
+    owner = _gym_member_from_row(row,"owner")
+    return (key,holder,owner)
 
 #TODO rewrite this function using general function that alters table based on query
 def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
@@ -475,6 +477,7 @@ def query_gym_member_records(database_path,querried_member:GymMember) -> list[Gy
             deleted_at
         FROM gym_members
     """
+    #TODO make internal function what does this loop
     conditions = []
     parameters = []
     for k,v in vars(querried_member).items():
@@ -493,6 +496,30 @@ def query_gym_member_records(database_path,querried_member:GymMember) -> list[Gy
         fetched_members = connection.execute(query, parameters).fetchall()
 
     return [_gym_member_from_row(member) for member in fetched_members]
+
+def query_key_table(database_path,querried_key:Key) -> list[Key]:
+    query = """
+    SELECT
+       id as key_id,
+       current_holder_id as current_holder_id,
+       owner_member_id as owner_id,
+       is_active as is_active
+    FROM keys
+    """
+    #TODO make internal function what does this loop
+    conditions = []
+    parameters = []
+    for k,v in vars(querried_key).items():
+        if v is not None:
+            condition = f"{k} = ?"
+            conditions.append(condition)
+            parameters.append(v)
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    with database_connection(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        fetched_keys = connection.execute(query, parameters).fetchall()
+    return [_key_from_row(key) for key in fetched_keys]
 
 def update_gym_member(database_path,member:GymMember) -> list[GymMember]:
     """Update supplied fields and return the updated gym member in a list"""

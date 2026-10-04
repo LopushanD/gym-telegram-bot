@@ -9,7 +9,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import bot, messages
 from src.key_service import TakeFromMailboxResult, TakeFromMailboxStatus
-from src.models import GymMember
+from src.models import GymMember, Key
 from src.keyboards import (
     RECEIVER_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX,
     RECEIVER_MAILBOX_KEY_OBTAINED_CANCEL_CALLBACK,
@@ -48,12 +48,12 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         query, message = self.make_query()
 
         with (
-            patch.object(bot, "get_key_count", return_value=2) as get_key_count,
+            patch.object(bot, "get_active_keys", return_value=[Key(key_id=1), Key(key_id=4)]) as get_active_keys,
             patch.object(bot, "take_key_from_mailbox") as take_key_from_mailbox,
         ):
             await bot.handle_key_obtained_from_mailbox(query, message)
 
-        get_key_count.assert_called_once_with(bot.DATABASE_PATH)
+        get_active_keys.assert_called_once_with(bot.DATABASE_PATH)
         take_key_from_mailbox.assert_not_called()
         query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
@@ -62,7 +62,7 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("reply_markup", kwargs)
         keyboard = kwargs["reply_markup"].inline_keyboard
         self.assertEqual("1", keyboard[0][0].text)
-        self.assertEqual("2", keyboard[1][0].text)
+        self.assertEqual("4", keyboard[1][0].text)
         self.assertEqual("Cancel", keyboard[2][0].text)
 
     async def test_take_from_mailbox_key_choice_asks_for_confirmation(self):

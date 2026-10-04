@@ -146,6 +146,7 @@ async def complete_handover_interaction(
     query: CallbackQuery,
     pending_handover: PendingHandover,
 ) -> None:
+    # TODO: Add check that the user still holds the key they want to give over
     change_key_holder(DATABASE_PATH, key_id, receiver.id)
     PENDING_HANDOVERS.pop(key_id)
     pending_handover.timeout_task.cancel()

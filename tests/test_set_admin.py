@@ -97,8 +97,8 @@ class SetAdminDatabaseTests(unittest.TestCase):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         self.database_path = Path(directory) / "test.sqlite3"
         initialize_database(self.database_path)
-        add_gym_member(self.database_path, 100, "Ada", "Lovelace", 101, "@ada")
-        add_gym_member(self.database_path, 200, "Alan", "Turing", 102, "@alan")
+        add_gym_member(self.database_path, GymMember(telegram_user_id=100, name="Ada", surname="Lovelace", room_number=101, telegram_name="@ada"))
+        add_gym_member(self.database_path, GymMember(telegram_user_id=200, name="Alan", surname="Turing", room_number=102, telegram_name="@alan"))
 
     def test_persists_both_values_and_preserves_other_data(self):
         unchanged_fields_query = """
@@ -132,12 +132,12 @@ class SetAdminIntegrationTests(unittest.IsolatedAsyncioTestCase):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         database_path = Path(directory) / "test.sqlite3"
         initialize_database(database_path)
-        add_gym_member(database_path, 100, "Ada", "Lovelace", 101, "@ada")
+        add_gym_member(database_path, GymMember(telegram_user_id=100, name="Ada", surname="Lovelace", room_number=101, telegram_name="@ada"))
         set_admin(database_path, 100, True)
         message = SimpleNamespace(reply_text=AsyncMock())
         update = SimpleNamespace(effective_message=message, effective_user=SimpleNamespace(id=100))
 
-        with patch("src.admin_command_handlers.DEFAULT_DATABASE_PATH", database_path):
+        with patch("src.admin_command_handlers.DATABASE_PATH", database_path):
             await set_admin_command_handler(update, SimpleNamespace(args=["100", "False"]))
             message.reply_text.assert_awaited_once_with(
                 messages.ADMIN_SET_ADMIN_COMPLETED_TEXT.format(

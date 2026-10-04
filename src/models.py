@@ -25,12 +25,12 @@ class KeyHolder:
     member: GymMember
 
 
-@dataclass(frozen=True)
-class KeyStatus:
-    key_id: int
-    current_holder: GymMember
-    owner: GymMember
-    is_active: bool
+@dataclass(frozen=False)
+class Key:
+    key_id: int | None = None
+    current_holder_id: int | None = None
+    owner_member_id: int | None = None
+    is_active: bool | None = None
 
 
 @dataclass(frozen=True)

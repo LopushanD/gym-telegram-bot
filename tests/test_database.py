@@ -1,3 +1,4 @@
+from contextlib import closing
 import random
 import sqlite3
 import sys
@@ -12,15 +13,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.database import (
     GymMemberAlreadyExistsError,
     add_gym_member,
-    delete_chat_message_ids,
     get_all_current_keyholders_info,
-    get_chat_message_ids,
     get_current_keyholder_info,
     get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
     query_gym_member_records,
     get_key_id_by_telegram_user_id,
-    get_key_count,
+    get_active_keys,
     get_key_history,
     get_key_status,
     get_key_owner_mailbox_info,
@@ -30,10 +29,9 @@ from src.database import (
     populate_members_table_with_mock_data,
     populate_test_mailboxes_and_keys,
     set_key_active,
-    store_chat_message_id,
     update_gym_member,
 )
-from src.models import GymMember, KeyHolder, KeyStatus
+from src.models import GymMember, KeyHolder, Key
 
 
 def create_gym_member(
@@ -43,12 +41,13 @@ def create_gym_member(
     name="Alex",
     telegram_name=None,
 ):
+    telegram_user_id = connection.execute("SELECT COALESCE(MAX(telegram_user_id), 0) + 1 FROM gym_members").fetchone()[0]
     cursor = connection.execute(
         """
-        INSERT INTO gym_members (name, surname, room_number, telegram_name)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO gym_members (telegram_user_id, name, surname, room_number, telegram_name)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (name, surname, room_number, telegram_name),
+        (telegram_user_id, name, surname, room_number, telegram_name),
     )
     return cursor.lastrowid
 
@@ -98,7 +97,7 @@ class DatabaseTests(unittest.TestCase):
 
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 table_names = {
                     row[0]
                     for row in connection.execute(
@@ -113,126 +112,7 @@ class DatabaseTests(unittest.TestCase):
             self.assertIn("gym_members", table_names)
             self.assertIn("keys", table_names)
             self.assertIn("key_holder_history", table_names)
-            self.assertIn("chat_messages", table_names)
 
-    def test_chat_messages_reference_gym_member_telegram_user_id(self):
-        with tempfile.TemporaryDirectory() as directory:
-            database_path = Path(directory) / "test.sqlite3"
-            initialize_database(database_path)
-
-            connection = sqlite3.connect(database_path)
-            try:
-                foreign_keys = connection.execute(
-                    "PRAGMA foreign_key_list(chat_messages)"
-                ).fetchall()
-            finally:
-                connection.close()
-
-            referenced_columns = {
-                foreign_key[3]: (foreign_key[2], foreign_key[4])
-                for foreign_key in foreign_keys
-            }
-            self.assertEqual(
-                ("gym_members", "telegram_user_id"),
-                referenced_columns["chat_id"],
-            )
-
-    def test_store_chat_message_id_tracks_messages_by_chat(self):
-        with tempfile.TemporaryDirectory() as directory:
-            database_path = Path(directory) / "test.sqlite3"
-            initialize_database(database_path)
-            connection = sqlite3.connect(database_path)
-            try:
-                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
-                create_gym_member_with_telegram_user_id(connection, 400, "Petrov", 102)
-                connection.commit()
-            finally:
-                connection.close()
-
-            store_chat_message_id(database_path, chat_id=300, message_id=10)
-            store_chat_message_id(database_path, chat_id=300, message_id=11)
-            store_chat_message_id(database_path, chat_id=400, message_id=99)
-
-            self.assertEqual([10, 11], get_chat_message_ids(database_path, 300))
-
-    def test_store_chat_message_id_ignores_duplicate_message_in_same_chat(self):
-        with tempfile.TemporaryDirectory() as directory:
-            database_path = Path(directory) / "test.sqlite3"
-            initialize_database(database_path)
-            connection = sqlite3.connect(database_path)
-            try:
-                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
-                connection.commit()
-            finally:
-                connection.close()
-
-            store_chat_message_id(database_path, chat_id=300, message_id=10)
-            store_chat_message_id(database_path, chat_id=300, message_id=10)
-
-            self.assertEqual([10], get_chat_message_ids(database_path, 300))
-
-    def test_store_chat_message_id_rejects_missing_gym_member(self):
-        with tempfile.TemporaryDirectory() as directory:
-            database_path = Path(directory) / "test.sqlite3"
-            initialize_database(database_path)
-
-            with self.assertRaises(sqlite3.IntegrityError):
-                store_chat_message_id(database_path, chat_id=300, message_id=10)
-
-    def test_delete_chat_message_ids_deletes_requested_messages_in_chat(self):
-        with tempfile.TemporaryDirectory() as directory:
-            database_path = Path(directory) / "test.sqlite3"
-            initialize_database(database_path)
-            connection = sqlite3.connect(database_path)
-            try:
-                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
-                create_gym_member_with_telegram_user_id(connection, 400, "Petrov", 102)
-                connection.commit()
-            finally:
-                connection.close()
-
-            store_chat_message_id(database_path, chat_id=300, message_id=10)
-            store_chat_message_id(database_path, chat_id=300, message_id=11)
-            store_chat_message_id(database_path, chat_id=400, message_id=10)
-
-            deleted_count = delete_chat_message_ids(database_path, 300, [10])
-
-            self.assertEqual(1, deleted_count)
-            self.assertEqual([11], get_chat_message_ids(database_path, 300))
-            self.assertEqual([10], get_chat_message_ids(database_path, 400))
-
-    def test_delete_chat_message_ids_always_deletes_old_messages_in_chat(self):
-        with tempfile.TemporaryDirectory() as directory:
-            database_path = Path(directory) / "test.sqlite3"
-            initialize_database(database_path)
-            connection = sqlite3.connect(database_path)
-            try:
-                create_gym_member_with_telegram_user_id(connection, 300, "Ivanov", 101)
-                connection.commit()
-            finally:
-                connection.close()
-
-            store_chat_message_id(database_path, chat_id=300, message_id=10)
-            store_chat_message_id(database_path, chat_id=300, message_id=11)
-            store_chat_message_id(database_path, chat_id=300, message_id=12)
-            connection = sqlite3.connect(database_path)
-            try:
-                connection.execute(
-                    """
-                    UPDATE chat_messages
-                    SET created_at = datetime('now', '-49 hours')
-                    WHERE chat_id = ? AND message_id = ?
-                    """,
-                    (300, 12),
-                )
-                connection.commit()
-            finally:
-                connection.close()
-
-            deleted_count = delete_chat_message_ids(database_path, 300, [10])
-
-            self.assertEqual(2, deleted_count)
-            self.assertEqual([11], get_chat_message_ids(database_path, 300))
 
     def test_initialize_database_can_run_more_than_once(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -241,7 +121,7 @@ class DatabaseTests(unittest.TestCase):
             initialize_database(database_path)
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 gym_members_table = connection.execute(
                     """
                     SELECT name
@@ -258,7 +138,7 @@ class DatabaseTests(unittest.TestCase):
 
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 column_names = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info(gym_members)")
@@ -271,7 +151,7 @@ class DatabaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 connection.execute(
                     """
                     CREATE TABLE gym_members (
@@ -290,7 +170,7 @@ class DatabaseTests(unittest.TestCase):
 
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 column_names = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info(gym_members)")
@@ -305,7 +185,7 @@ class DatabaseTests(unittest.TestCase):
 
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 foreign_keys = connection.execute("PRAGMA foreign_key_list(keys)").fetchall()
 
             referenced_columns = {
@@ -325,7 +205,7 @@ class DatabaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 connection.execute(
                     """
                     CREATE TABLE gym_members (
@@ -360,7 +240,7 @@ class DatabaseTests(unittest.TestCase):
 
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 key_owner = connection.execute(
                     """
                     SELECT owner_member_id
@@ -372,32 +252,32 @@ class DatabaseTests(unittest.TestCase):
 
             self.assertEqual((holder_id,), key_owner)
 
-    def test_get_key_count_returns_total_number_of_keys(self):
+    def test_get_active_keys_returns_existing_keys(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 first_holder_id = create_gym_member(connection, "Ivanov", 101)
                 second_holder_id = create_gym_member(connection, "Petrov", 102)
                 create_key(connection, first_holder_id)
                 create_key(connection, second_holder_id)
 
-            self.assertEqual(2, get_key_count(database_path))
+            self.assertEqual([1, 2], [key.key_id for key in get_active_keys(database_path)])
 
     def test_change_key_holder_updates_key_holder_and_history(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 first_holder_id = create_gym_member(connection, "Ivanov", 101)
                 second_holder_id = create_gym_member(connection, "Petrov", 102)
                 key_id = create_key(connection, first_holder_id)
 
             change_key_holder(database_path, key_id, second_holder_id)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 current_holder_id = connection.execute(
                     "SELECT current_holder_id FROM keys WHERE id = ?",
                     (key_id,),
@@ -419,7 +299,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 first_holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     100,
@@ -460,7 +340,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     100,
@@ -493,7 +373,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 owner_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -530,7 +410,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member(connection, "Ivanov", 101)
                 key_id = create_key(connection, holder_id)
 
@@ -542,7 +422,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member(connection, "Ivanov", 101)
 
             with self.assertRaisesRegex(ValueError, "key does not exist: 999"):
@@ -558,7 +438,7 @@ class DatabaseTests(unittest.TestCase):
                 rng=random.Random(1),
             )
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 members = connection.execute(
                     """
                     SELECT
@@ -610,7 +490,7 @@ class DatabaseTests(unittest.TestCase):
 
             mailbox_ids, key_ids = populate_test_mailboxes_and_keys(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 mailboxes = connection.execute(
                     """
                     SELECT
@@ -635,8 +515,8 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(
                 [
                     (mailbox_ids[0], 0, "Dima's", "Mailbox", 1001, None),
-                    (mailbox_ids[1], -1, "Second", "Mailbox", 3062, None),
-                    (mailbox_ids[2], -2, "Last", "Mailbox", 9999, None),
+                    (mailbox_ids[1], 1, "Second", "Mailbox", 3062, None),
+                    (mailbox_ids[2], 2, "Last", "Mailbox", 9999, None),
                 ],
                 mailboxes,
             )
@@ -657,7 +537,7 @@ class DatabaseTests(unittest.TestCase):
             first_result = populate_test_mailboxes_and_keys(database_path)
             second_result = populate_test_mailboxes_and_keys(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 mailbox_count = connection.execute(
                     """
                     SELECT COUNT(*)
@@ -676,7 +556,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -710,7 +590,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 first_holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -776,7 +656,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -814,7 +694,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -836,7 +716,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 member_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -868,7 +748,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 member_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -890,7 +770,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 expected_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -909,9 +789,7 @@ class DatabaseTests(unittest.TestCase):
 
             members = query_gym_member_records(
                 database_path,
-                name="ada",
-                surname="lovelace",
-                room_number=1234,
+                GymMember(name="ada", surname="lovelace", room_number=1234),
             )
 
             self.assertEqual(1, len(members))
@@ -929,15 +807,9 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            member = add_gym_member(
-                database_path,
-                telegram_user_id=123456,
-                name="Database",
-                surname="Member",
-                room_number=1234,
-                telegram_name="@database_member",
-            )
+            add_gym_member(database_path, GymMember(telegram_user_id=123456, name="Database", surname="Member", room_number=1234, telegram_name="@database_member"))
 
+            member = get_gym_member_by_telegram_user_id(database_path, 123456)
             self.assertEqual(123456, member.telegram_user_id)
             self.assertEqual("Database Member", member.full_name)
             self.assertEqual(1234, member.room_number)
@@ -950,81 +822,50 @@ class DatabaseTests(unittest.TestCase):
             initialize_database(database_path)
 
             with self.assertRaisesRegex(ValueError, "telegram name is required"):
-                add_gym_member(
-                    database_path,
-                    telegram_user_id=123456,
-                    name="Database",
-                    surname="Member",
-                    room_number=1234,
-                    telegram_name="",
-                )
+                add_gym_member(database_path, GymMember(telegram_user_id=123456, name="Database", surname="Member", room_number=1234, telegram_name=""))
 
     def test_add_gym_member_rejects_duplicate_telegram_user_id(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
-            add_gym_member(
-                database_path,
-                telegram_user_id=123456,
-                name="First",
-                surname="Member",
-                room_number=1234,
-                telegram_name="@first",
-            )
+            add_gym_member(database_path, GymMember(telegram_user_id=123456, name="First", surname="Member", room_number=1234, telegram_name="@first"))
 
             with self.assertRaisesRegex(
                 GymMemberAlreadyExistsError,
                 "gym member already exists for Telegram ID: 123456",
             ):
-                add_gym_member(
-                    database_path,
-                    telegram_user_id=123456,
-                    name="Second",
-                    surname="Member",
-                    room_number=5678,
-                    telegram_name="@second",
-                )
+                add_gym_member(database_path, GymMember(telegram_user_id=123456, name="Second", surname="Member", room_number=5678, telegram_name="@second"))
 
     def test_update_gym_member_updates_only_supplied_fields(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
-            add_gym_member(
-                database_path,
-                telegram_user_id=123456,
-                name="Old",
-                surname="Surname",
-                room_number=1234,
-                telegram_name="@old",
-            )
+            add_gym_member(database_path, GymMember(telegram_user_id=123456, name="Old", surname="Surname", room_number=1234, telegram_name="@old"))
 
-            member = update_gym_member(
-                database_path,
-                123456,
-                name="New",
-                room_number=4321,
-            )
+            members = update_gym_member(database_path, GymMember(telegram_user_id=123456, name="New", room_number=4321))
 
+            self.assertEqual(1, len(members))
+            member = members[0]
             self.assertEqual("New", member.name)
             self.assertEqual("Surname", member.surname)
             self.assertEqual(4321, member.room_number)
             self.assertEqual("@old", member.telegram_name)
 
-    def test_update_gym_member_returns_none_when_member_is_missing(self):
+    def test_update_gym_member_returns_empty_list_when_member_is_missing(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            member = update_gym_member(database_path, 123456, name="New")
+            members = update_gym_member(database_path, GymMember(telegram_user_id=123456, name="New"))
 
-            self.assertIsNone(member)
+            self.assertEqual([], members)
 
     def test_get_key_id_by_telegram_user_id_returns_currently_held_key_id(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -1057,7 +898,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 owner_id = create_gym_member(connection, "Owner", 1234)
                 holder_id = create_gym_member_with_telegram_user_id(
                     connection,
@@ -1080,7 +921,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 owner_id = create_gym_member_with_telegram_user_id(
                     connection,
                     100,
@@ -1101,33 +942,26 @@ class DatabaseTests(unittest.TestCase):
                     (key_id,),
                 )
 
-            self.assertEqual(
-                KeyStatus(
-                    key_id=key_id,
-                    current_holder=GymMember(
-                        holder_id, 200, "Current", "Holder", 5678, None, False
-                    ),
-                    owner=GymMember(
-                        owner_id, 100, "Key", "Mailbox", 1234, None, False
-                    ),
-                    is_active=False,
-                ),
-                get_key_status(database_path, key_id),
-            )
+            key, holder, owner = get_key_status(database_path, key_id)
+            self.assertEqual(Key(key_id, holder_id, owner_id, False), key)
+            self.assertEqual(GymMember(holder_id, 200, "Current", "Holder", 5678, None, False), holder)
+            self.assertEqual(GymMember(owner_id, 100, "Key", "Mailbox", 1234, None, False), owner)
+            self.assertIs(holder.is_admin, False)
+            self.assertIs(owner.is_admin, False)
 
-    def test_get_key_status_returns_none_for_missing_key(self):
+    def test_get_key_status_returns_empty_triple_for_missing_key(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            self.assertIsNone(get_key_status(database_path, 999))
+            self.assertEqual((None, None, None), get_key_status(database_path, 999))
 
     def test_set_key_active_updates_status(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with sqlite3.connect(database_path) as connection:
+            with closing(sqlite3.connect(database_path)) as connection, connection:
                 holder_id = create_gym_member_with_telegram_user_id(
                     connection,
                     123456,
@@ -1137,9 +971,9 @@ class DatabaseTests(unittest.TestCase):
                 key_id = create_key(connection, holder_id)
 
             self.assertTrue(set_key_active(database_path, key_id, False))
-            self.assertFalse(get_key_status(database_path, key_id).is_active)
+            self.assertFalse(get_key_status(database_path, key_id)[0].is_active)
             self.assertTrue(set_key_active(database_path, key_id, True))
-            self.assertTrue(get_key_status(database_path, key_id).is_active)
+            self.assertTrue(get_key_status(database_path, key_id)[0].is_active)
 
     def test_set_key_active_returns_false_for_missing_key(self):
         with tempfile.TemporaryDirectory() as directory:
