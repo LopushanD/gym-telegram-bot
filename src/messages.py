@@ -92,10 +92,7 @@ def current_key_holder_text(holder: KeyHolder) -> str:
         f"room {member.room_number}."
     )
     if member.telegram_name is not None:
-        telegram_name = member.telegram_name
-        if not telegram_name.startswith("@"):
-            telegram_name = f"@{telegram_name}"
-        text += f"\nTelegram name: {telegram_name}"
+        text += f"\nTelegram name: {member.telegram_name}"
     return text
 
 def key_status_text(key: Key,holder:GymMember,owner:GymMember) -> str:

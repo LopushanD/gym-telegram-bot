@@ -13,11 +13,48 @@ from src.database import (
     add_gym_member,
     get_gym_member_by_telegram_user_id,
     initialize_database,
+    update_gym_member,
 )
 from src.models import GymMember
 
 
 class RegistrationDatabaseFieldTests(unittest.TestCase):
+    def test_creation_normalizes_telegram_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            for telegram_user_id, telegram_name in enumerate(("ada", "@ada", "  ada  ", "  @ada  "), start=200):
+                with self.subTest(telegram_name=telegram_name):
+                    add_gym_member(database_path, GymMember(
+                        telegram_user_id=telegram_user_id, name="Ada", surname="Lovelace",
+                        room_number=1204, telegram_name=telegram_name,
+                    ))
+                    member = get_gym_member_by_telegram_user_id(database_path, telegram_user_id)
+                    self.assertEqual("@ada", member.telegram_name)
+
+    def test_username_updates_preserve_prefix_and_reject_blank_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.sqlite3"
+            initialize_database(database_path)
+            add_gym_member(database_path, GymMember(
+                telegram_user_id=123, name="Ada", surname="Lovelace",
+                room_number=1204, telegram_name="@ada",
+            ))
+            for telegram_name in ("new_ada", "@new_ada"):
+                with self.subTest(telegram_name=telegram_name):
+                    members = update_gym_member(database_path, GymMember(
+                        telegram_user_id=123, telegram_name=telegram_name,
+                    ))
+                    self.assertEqual("@new_ada", members[0].telegram_name)
+                    self.assertEqual("@new_ada", get_gym_member_by_telegram_user_id(database_path, 123).telegram_name)
+            for telegram_name in ("", "   "):
+                with self.subTest(telegram_name=telegram_name):
+                    with self.assertRaisesRegex(ValueError, "telegram name is required"):
+                        update_gym_member(database_path, GymMember(
+                            telegram_user_id=123, telegram_name=telegram_name,
+                        ))
+                    self.assertEqual("@new_ada", get_gym_member_by_telegram_user_id(database_path, 123).telegram_name)
+
     def test_fresh_database_has_telegram_name_and_no_phone_column(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"

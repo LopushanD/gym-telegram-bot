@@ -101,7 +101,7 @@ def initialize_database(database_path):
                 name TEXT NOT NULL,
                 surname TEXT NOT NULL,
                 room_number INTEGER NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT (datetime('now', 'localtime')),
                 telegram_name TEXT,
                 is_admin INTEGER NOT NULL DEFAULT 0,
                 deleted_at TIMESTAMP DEFAULT NULL,
@@ -116,7 +116,7 @@ def initialize_database(database_path):
                 current_holder_id INTEGER NOT NULL,
                 owner_member_id INTEGER NOT NULL,
                 is_active INTEGER NOT NULL DEFAULT 1,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT (datetime('now', 'localtime')),
                 FOREIGN KEY (current_holder_id) REFERENCES gym_members(id),
                 FOREIGN KEY (owner_member_id) REFERENCES gym_members(id)
             )
@@ -166,7 +166,7 @@ def change_key_holder(database_path, key_id, new_holder_id):
         connection.execute(
             """
             INSERT INTO key_holder_history (key_id, holder_id, taken_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, datetime('now', 'localtime'))
             """,
             (key_id, new_holder_id),
         )
@@ -521,10 +521,18 @@ def query_key_table(database_path,querried_key:Key) -> list[Key]:
         fetched_keys = connection.execute(query, parameters).fetchall()
     return [_key_from_row(key) for key in fetched_keys]
 
+def _normalize_telegram_name(telegram_name: str) -> str:
+    telegram_name = telegram_name.strip()
+    if not telegram_name.startswith("@"):
+        telegram_name = f"@{telegram_name}"
+    return telegram_name
+
 def update_gym_member(database_path,member:GymMember) -> list[GymMember]:
     """Update supplied fields and return the updated gym member in a list"""
     if member.id is not None:
         raise ValueError("Member id must not be changed!")
+    if member.telegram_name is not None:
+        member.telegram_name = _normalize_telegram_name(member.telegram_name)
     fields = []
     parameters = []
     for k,v in vars(member).items():
@@ -550,6 +558,7 @@ def update_gym_member(database_path,member:GymMember) -> list[GymMember]:
 def add_gym_member(
     database_path,new_user:GymMember) -> None:
     """Create and return a gym member."""
+    new_user.telegram_name = _normalize_telegram_name(new_user.telegram_name)
     try:
         with database_connection(database_path) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
