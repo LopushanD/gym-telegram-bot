@@ -521,10 +521,18 @@ def query_key_table(database_path,querried_key:Key) -> list[Key]:
         fetched_keys = connection.execute(query, parameters).fetchall()
     return [_key_from_row(key) for key in fetched_keys]
 
+def _normalize_telegram_name(telegram_name: str) -> str:
+    telegram_name = telegram_name.strip()
+    if not telegram_name.startswith("@"):
+        telegram_name = f"@{telegram_name}"
+    return telegram_name
+
 def update_gym_member(database_path,member:GymMember) -> list[GymMember]:
     """Update supplied fields and return the updated gym member in a list"""
     if member.id is not None:
         raise ValueError("Member id must not be changed!")
+    if member.telegram_name is not None:
+        member.telegram_name = _normalize_telegram_name(member.telegram_name)
     fields = []
     parameters = []
     for k,v in vars(member).items():
@@ -550,6 +558,7 @@ def update_gym_member(database_path,member:GymMember) -> list[GymMember]:
 def add_gym_member(
     database_path,new_user:GymMember) -> None:
     """Create and return a gym member."""
+    new_user.telegram_name = _normalize_telegram_name(new_user.telegram_name)
     try:
         with database_connection(database_path) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
