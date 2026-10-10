@@ -101,7 +101,7 @@ def initialize_database(database_path):
                 name TEXT NOT NULL,
                 surname TEXT NOT NULL,
                 room_number INTEGER NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT (datetime('now', 'localtime')),
                 telegram_name TEXT,
                 is_admin INTEGER NOT NULL DEFAULT 0,
                 deleted_at TIMESTAMP DEFAULT NULL,
@@ -116,7 +116,7 @@ def initialize_database(database_path):
                 current_holder_id INTEGER NOT NULL,
                 owner_member_id INTEGER NOT NULL,
                 is_active INTEGER NOT NULL DEFAULT 1,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT (datetime('now', 'localtime')),
                 FOREIGN KEY (current_holder_id) REFERENCES gym_members(id),
                 FOREIGN KEY (owner_member_id) REFERENCES gym_members(id)
             )
@@ -166,7 +166,7 @@ def change_key_holder(database_path, key_id, new_holder_id):
         connection.execute(
             """
             INSERT INTO key_holder_history (key_id, holder_id, taken_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, datetime('now', 'localtime'))
             """,
             (key_id, new_holder_id),
         )
