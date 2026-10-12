@@ -81,14 +81,14 @@ ADMIN_DEACTIVATE_KEY_USAGE_TEXT = "Usage: /deactivatekey key_id"
 ADMIN_ACTIVATE_KEY_COMPLETED_TEXT = "Activated key {key_id}."
 ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT = "Deactivated key {key_id}."
 
-def mailbox_receiver_take_prompt(key_id: int) -> str:
-    return f"Confirm that you received key {key_id} from the mailbox."
+def mailbox_receiver_take_prompt(key: Key) -> str:
+    return MAILBOX_RECEIVER_TAKE_PROMPT.format(key_id=key.label)
 
 
 def current_key_holder_text(holder: KeyHolder) -> str:
     member = holder.member
     text = (
-        f"Key {holder.key_id} is currently held by {member.full_name}, "
+        f"Key {holder.label} is currently held by {member.full_name}, "
         f"room {member.room_number}."
     )
     if member.telegram_name is not None:
@@ -98,7 +98,7 @@ def current_key_holder_text(holder: KeyHolder) -> str:
 def key_status_text(key: Key,holder:GymMember,owner:GymMember) -> str:
     return gym_member_record_separator.join(
         (
-            f"Key ID: {key.key_id}\nActive: {'yes' if key.is_active else 'no'}",
+            f"Key: {key.label}\nActive: {'yes' if key.is_active else 'no'}",
             f"Current holder\n\n{process_gym_member_records([holder],gym_member_record_separator,True,True,True)[0]}",
             f"Owner\n\n{process_gym_member_records([owner],gym_member_record_separator,True,True,True)[0]}"
         )

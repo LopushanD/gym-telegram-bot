@@ -44,7 +44,7 @@ class ActiveKeySelectionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_active_query_preserves_ids_and_member_references(self):
         self.assertCountEqual(
-            [Key(2, 2, 1, True), Key(9, 2, 1, True)],
+            [Key(2, 2, 1, True, "Unnamed"), Key(9, 2, 1, True, "Unnamed")],
             get_active_keys(self.database_path),
         )
 
@@ -77,7 +77,7 @@ class ActiveKeySelectionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((messages.KEY_CHOICE_PROMPT,), args)
                 buttons = [button for row in kwargs["reply_markup"].inline_keyboard for button in row]
                 self.assertCountEqual(
-                    [("2", f"{prefix}:2"), ("9", f"{prefix}:9"), ("Cancel", cancel)],
+                    [("2 (Unnamed)", f"{prefix}:2"), ("9 (Unnamed)", f"{prefix}:9"), ("Cancel", cancel)],
                     [(button.text, button.callback_data) for button in buttons],
                 )
 
@@ -140,7 +140,7 @@ class ActiveKeySelectionTests(unittest.IsolatedAsyncioTestCase):
         with patch("src.admin_command_handlers.DATABASE_PATH", self.database_path):
             await key_status_command_handler(update, SimpleNamespace(args=["5"]))
         text = message.reply_text.await_args.args[0]
-        for expected in ("Key ID: 5", "Active: no", "Current Holder", "Key Owner",
+        for expected in ("Key: 5 (Unnamed)", "Active: no", "Current Holder", "Key Owner",
                          "Gym member ID: 2", "Gym member ID: 1", "is admin: True", "is admin: False"):
             self.assertIn(expected, text)
 
@@ -149,4 +149,4 @@ class ActiveKeySelectionTests(unittest.IsolatedAsyncioTestCase):
         update = SimpleNamespace(effective_message=message, effective_user=SimpleNamespace(id=200))
         with patch("src.admin_command_handlers.DATABASE_PATH", self.database_path):
             await key_status_command_handler(update, SimpleNamespace(args=["999"]))
-        message.reply_text.assert_awaited_once_with(messages.KEY_NOT_ACTIVE_TEXT.format(key_id=999))
+        message.reply_text.assert_awaited_once_with(messages.KEY_NOT_FOUND_TEXT.format(key_id=999))

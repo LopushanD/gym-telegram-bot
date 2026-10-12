@@ -35,17 +35,17 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         rows = keyboard.inline_keyboard
 
         self.assertEqual(4, len(rows))
-        self.assertEqual("1", rows[0][0].text)
+        self.assertEqual("1 (Unnamed)", rows[0][0].text)
         self.assertEqual(
             f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:1",
             rows[0][0].callback_data,
         )
-        self.assertEqual("4", rows[1][0].text)
+        self.assertEqual("4 (Unnamed)", rows[1][0].text)
         self.assertEqual(
             f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:4",
             rows[1][0].callback_data,
         )
-        self.assertEqual("9", rows[2][0].text)
+        self.assertEqual("9 (Unnamed)", rows[2][0].text)
         self.assertEqual(
             f"{RECEIVER_HANDOVER_KEY_CHOICE_CALLBACK_PREFIX}:9",
             rows[2][0].callback_data,
@@ -93,8 +93,8 @@ class HandoverReceiverKeyChoiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((messages.KEY_CHOICE_PROMPT,), args)
         self.assertIn("reply_markup", kwargs)
         keyboard = kwargs["reply_markup"].inline_keyboard
-        self.assertEqual("1", keyboard[0][0].text)
-        self.assertEqual("4", keyboard[1][0].text)
+        self.assertEqual("1 (Unnamed)", keyboard[0][0].text)
+        self.assertEqual("4 (Unnamed)", keyboard[1][0].text)
         self.assertEqual("Cancel", keyboard[2][0].text)
 
     async def test_first_click_rejects_unregistered_user_before_showing_keys(self):

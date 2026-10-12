@@ -62,7 +62,7 @@ def process_key_history_records(records: list[KeyHistoryRecord],separator:str)->
 def _key_history_record_text(record: KeyHistoryRecord) -> str:
     return (
         f"{record.taken_at:%Y-%m-%d %H:%M:%S}: "
-        f"key {record.key_id} received by {record.member.full_name}, "
+        f"key {record.key.label} received by {record.member.full_name}, "
         f"room {record.member.room_number} "
         f"{record.member.telegram_name}"
     )

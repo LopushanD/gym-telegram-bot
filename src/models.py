@@ -18,12 +18,15 @@ class GymMember:
     def full_name(self) -> str:
         return f"{self.name} {self.surname}"
 
-
 @dataclass(frozen=True)
 class KeyHolder:
     key_id: int
     member: GymMember
+    key_name: str = "Unnamed"
 
+    @property
+    def label(self) -> str:
+        return _format_key_label(self.key_id, self.key_name)
 
 @dataclass(frozen=False)
 class Key:
@@ -31,11 +34,18 @@ class Key:
     current_holder_id: int | None = None
     owner_member_id: int | None = None
     is_active: bool | None = None
+    name: str | None = None
 
+    @property
+    def label(self) -> str:
+        return _format_key_label(self.key_id, self.name)
 
 @dataclass(frozen=True)
 class KeyHistoryRecord:
     event_id: int
-    key_id: int
+    key: Key
     member: GymMember
     taken_at: datetime
+
+def _format_key_label(key_id: int | None, name: str | None) -> str:
+    return f"{key_id or ""} ({name or "Unnamed"})"

@@ -13,6 +13,9 @@ from src.models import GymMember
 
 
 class HandoverFlowTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.enterContext(patch("src.handover_flow.get_key_label", side_effect=lambda path, key_id: str(key_id)))
+
     async def asyncTearDown(self):
         for pending_handover in handover_flow.PENDING_HANDOVERS.values():
             pending_handover.timeout_task.cancel()

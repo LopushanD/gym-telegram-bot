@@ -1,4 +1,5 @@
 from telegram import Update
+from src.key_service import get_key_label
 from src import messages
 from src.config import DATABASE_PATH,LAST_N_RECORDS_DEFAULT,gym_member_record_separator
 from src.admin_commands import *
@@ -158,7 +159,7 @@ async def give_key_command_handler(update: Update, context) -> None:
         # TODO why do we need to cancel pending handover? just to be sure?
         cancel_pending_handover(key_id)
         reply = messages.ADMIN_GIVE_KEY_COMPLETED_TEXT.format(
-            key_id=key_id,
+            key_id=get_key_label(DATABASE_PATH, key_id),
             member=result.member.full_name,
             telegram_user_id=telegram_user_id,
         )
@@ -203,7 +204,7 @@ async def change_key_owner_command_handler(update: Update, context) -> None:
 
     await message.reply_text(
         messages.ADMIN_CHANGE_KEY_OWNER_COMPLETED_TEXT.format(
-            key_id=key_id,
+            key_id=get_key_label(DATABASE_PATH, key_id),
             member=member.full_name,
             telegram_user_id=telegram_user_id,
         )
@@ -378,7 +379,7 @@ async def set_key_active_command_handler(
         messages.ADMIN_ACTIVATE_KEY_COMPLETED_TEXT
         if do_activate
         else messages.ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT)
-    await message.reply_text(reply.format(key_id=key_id))
+    await message.reply_text(reply.format(key_id=get_key_label(DATABASE_PATH, key_id)))
     
 # Adapters to make handlers compatible with Telegram API
 async def activate_key_command_handler(update: Update, context) -> None:

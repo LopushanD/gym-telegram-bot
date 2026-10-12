@@ -40,6 +40,7 @@ def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember
 def _key_from_row(row: sqlite3.Row, prefix: str|None = None) -> Key:
     key = Key(
         key_id=row["key_id"] if prefix is None else row[f"{prefix}_key_id"],
+        name=row["key_name"] if prefix is None else row[f"{prefix}_key_name"],
     current_holder_id=row["current_holder_id"] if prefix is None else row[f"{prefix}_current_holder_id"],
     owner_member_id=row["owner_id"] if prefix is None else row[f"{prefix}_owner_id"],
     is_active=row["is_active"] if prefix is None else row[f"{prefix}_is_active"]
@@ -90,7 +91,7 @@ TEST_MAILBOXES = (
 
 
 def initialize_database(database_path):
-    """Create the application database tables if they do not exist yet."""
+    """Create application tables and migrate existing keys to include names."""
     with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(
@@ -113,6 +114,7 @@ def initialize_database(database_path):
             """
             CREATE TABLE IF NOT EXISTS keys (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL DEFAULT 'Unnamed',
                 current_holder_id INTEGER NOT NULL,
                 owner_member_id INTEGER NOT NULL,
                 is_active INTEGER NOT NULL DEFAULT 1,
@@ -122,6 +124,9 @@ def initialize_database(database_path):
             )
             """
         )
+        key_columns = {row[1] for row in connection.execute("PRAGMA table_info(keys)")}
+        if "name" not in key_columns:
+            connection.execute("ALTER TABLE keys ADD COLUMN name TEXT NOT NULL DEFAULT 'Unnamed'")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS key_holder_history (
@@ -199,7 +204,10 @@ def get_key_owner_mailbox_info(database_path, key_id) -> GymMember | None:
 
 def get_key_return_instruction_info(database_path, telegram_user_id):
     query = """
-        SELECT keys.id, mailbox.room_number
+        SELECT 
+        keys.id AS key_id,
+        keys.name AS key_name,
+        mailbox.room_number AS owner_room_number
         FROM keys
         JOIN gym_members holder
             ON keys.current_holder_id = holder.id
@@ -211,6 +219,7 @@ def get_key_return_instruction_info(database_path, telegram_user_id):
     """
     with database_connection(database_path) as connection:
         return connection.execute(query, [telegram_user_id]).fetchone()
+    
 #TODO use KeyHistoryRecord here, KeyHolder is just its subset
 def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_member_id=None
                                ) -> KeyHolder | None:
@@ -218,6 +227,7 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
     query = """
         SELECT
             keys.id AS key_id,
+            keys.name AS key_name,
             gym_members.id AS member_id,
             gym_members.telegram_user_id,
             gym_members.name,
@@ -251,6 +261,7 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
 
     return KeyHolder(
         key_id=holder["key_id"],
+        key_name=holder["key_name"],
         member=_gym_member_from_row(holder))
 
 #TODO This function does almost the same as get-key_return_instruction_info. They could be combined into single fuction. 
@@ -277,6 +288,7 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
     query = """
         SELECT
             keys.id AS key_id,
+            keys.name AS key_name,
             keys.is_active as is_active,
             gym_members.id AS member_id,
             gym_members.telegram_user_id,
@@ -314,6 +326,7 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
     return [
         KeyHolder(
             key_id=holder["key_id"],
+            key_name=holder["key_name"],
             member=_gym_member_from_row(holder),
         )
         for holder in holders
@@ -330,6 +343,7 @@ def get_key_status(database_path, key_id: int) -> tuple[Key,GymMember,GymMember]
     query = """
         SELECT
             keys.id AS key_id,
+            keys.name AS key_name,
             keys.is_active,
             holder.id AS holder_member_id,
             holder.telegram_user_id AS holder_telegram_user_id,
@@ -363,6 +377,7 @@ def get_key_status(database_path, key_id: int) -> tuple[Key,GymMember,GymMember]
 
     key = Key(
         key_id=row["key_id"],
+        name=row["key_name"],
         current_holder_id=row["holder_member_id"],
         owner_member_id=row["owner_member_id"],
         is_active=bool(row["is_active"]))
@@ -414,7 +429,11 @@ def get_key_history(
     query = """
         SELECT
             history.event_id,
-            history.key_id,
+            keys.id AS key_id,
+            keys.current_holder_id AS current_holder_id,
+            keys.owner_member_id AS owner_id,
+            keys.is_active AS is_active,
+            keys.name AS key_name,
             history.taken_at,
             members.id AS member_id,
             members.telegram_user_id,
@@ -426,6 +445,7 @@ def get_key_history(
             members.suspended_until,
             members.deleted_at
         FROM key_holder_history history
+        JOIN keys ON keys.id = history.key_id
         JOIN gym_members members ON members.id = history.holder_id
         WHERE history.key_id = ?
         ORDER BY history.taken_at DESC, history.event_id DESC
@@ -439,7 +459,7 @@ def get_key_history(
     return [
         KeyHistoryRecord(
             event_id=record["event_id"],
-            key_id=record["key_id"],
+            key=_key_from_row(record),
             member=_gym_member_from_row(record),
             taken_at=datetime.fromisoformat(record["taken_at"]),
         )
@@ -501,6 +521,7 @@ def query_key_table(database_path,querried_key:Key) -> list[Key]:
     query = """
     SELECT
        id as key_id,
+       name as key_name,
        current_holder_id as current_holder_id,
        owner_member_id as owner_id,
        is_active as is_active

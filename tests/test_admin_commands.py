@@ -56,6 +56,7 @@ def build_member(telegram_user_id: int, *, is_admin: bool = False) -> GymMember:
 
 class AdminCommandHelpTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -160,6 +161,7 @@ class AdminCommandHelpTests(unittest.IsolatedAsyncioTestCase):
 
 class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -241,7 +243,7 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=999),
+            messages.KEY_NOT_FOUND_TEXT.format(key_id=999),
         )
 
     async def test_gives_key_and_reports_target_member(self):
@@ -275,6 +277,7 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -477,6 +480,7 @@ class UpdateUserArgumentTests(unittest.TestCase):
 
 class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -625,6 +629,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -760,6 +765,7 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -799,7 +805,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
     async def test_uses_key_id_and_default_limit_and_replies_with_history(self):
         record = KeyHistoryRecord(
             event_id=1,
-            key_id=2,
+            key=Key(key_id=2),
             member=build_member(200),
             taken_at=datetime(2026, 6, 5, 12, 30),
         )
@@ -883,6 +889,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -929,7 +936,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
 
         get_status.assert_called_once_with(DATABASE_PATH, 99)
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99),
+            messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
         )
 
     async def test_replies_with_complete_key_status(self):
@@ -955,6 +962,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -1003,7 +1011,7 @@ class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
 
         set_active.assert_called_once_with(DATABASE_PATH, 99, True)
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99),
+            messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
         )
 
     async def test_activate_sets_key_active(self):

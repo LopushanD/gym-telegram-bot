@@ -327,7 +327,11 @@ class DatabaseTests(unittest.TestCase):
             records = get_key_history(database_path, key_id, limit=1)
 
             self.assertEqual(1, len(records))
-            self.assertEqual(key_id, records[0].key_id)
+            self.assertEqual(
+                Key(key_id=key_id, current_holder_id=first_holder_id,
+                    owner_member_id=first_holder_id, is_active=True, name="Unnamed"),
+                records[0].key,
+            )
             self.assertEqual(second_holder_id, records[0].member.id)
             self.assertEqual(datetime(2026, 6, 2, 10, 0), records[0].taken_at)
 
@@ -362,7 +366,7 @@ class DatabaseTests(unittest.TestCase):
 
             records = get_key_history(database_path, first_key_id)
 
-            self.assertEqual([first_key_id], [record.key_id for record in records])
+            self.assertEqual([first_key_id], [record.key.key_id for record in records])
 
     def test_get_key_history_rejects_non_positive_key_id(self):
         with self.assertRaises(ValueError):
@@ -914,7 +918,7 @@ class DatabaseTests(unittest.TestCase):
 
             instruction = get_key_return_instruction_info(database_path, 123456)
 
-            self.assertEqual((key_id, 1234), instruction)
+            self.assertEqual((key_id, "Unnamed", 1234), instruction)
 
     def test_get_key_status_returns_holder_owner_and_active_status(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -943,7 +947,7 @@ class DatabaseTests(unittest.TestCase):
                 )
 
             key, holder, owner = get_key_status(database_path, key_id)
-            self.assertEqual(Key(key_id, holder_id, owner_id, False), key)
+            self.assertEqual(Key(key_id, holder_id, owner_id, False, "Unnamed"), key)
             self.assertEqual(GymMember(holder_id, 200, "Current", "Holder", 5678, None, False), holder)
             self.assertEqual(GymMember(owner_id, 100, "Key", "Mailbox", 1234, None, False), owner)
             self.assertIs(holder.is_admin, False)

@@ -27,6 +27,7 @@ from src.models import GymMember
 
 class ChangeKeyOwnerCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -84,7 +85,7 @@ class ChangeKeyOwnerCommandTests(unittest.IsolatedAsyncioTestCase):
     async def test_reports_missing_key(self):
         self.set_owner.return_value = False
         await change_key_owner_command_handler(self.update, SimpleNamespace(args=["99", "200"]))
-        self.message.reply_text.assert_awaited_once_with(messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99))
+        self.message.reply_text.assert_awaited_once_with(messages.KEY_NOT_FOUND_TEXT.format(key_id=99))
 
     async def test_sets_owner_using_member_id(self):
         await change_key_owner_command_handler(self.update, SimpleNamespace(args=["1", "200"]))
@@ -123,7 +124,12 @@ class SetKeyOwnerTests(unittest.TestCase):
         self.assertEqual(status.current_holder_id, self.holder.id)
         self.assertEqual(holder, self.holder)
         self.assertFalse(status.is_active)
-        self.assertEqual(get_key_history(self.database_path, self.key_id), history)
+        updated_history = get_key_history(self.database_path, self.key_id)
+        self.assertEqual(
+            [(record.event_id, record.key.key_id, record.member, record.taken_at) for record in history],
+            [(record.event_id, record.key.key_id, record.member, record.taken_at) for record in updated_history],
+        )
+        self.assertEqual(status, updated_history[0].key)
 
     def test_setting_same_owner_succeeds(self):
         self.assertTrue(set_key_owner(self.database_path, self.key_id, self.holder.id))

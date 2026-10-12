@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.config import DATABASE_PATH
-from src.models import GymMember, KeyHolder
+from src.models import GymMember, KeyHolder, Key
 from src.database import (
     change_key_holder,
     get_key_status,
@@ -11,11 +11,13 @@ from src.database import (
     get_key_return_instruction_info,
     get_gym_member_by_telegram_user_id,
     get_gym_member_id_by_telegram_user_id,
-    get_key_owner_mailbox_info
+    get_key_owner_mailbox_info,
+    query_key_table,
 )
 
 @dataclass(frozen=True)
 class KeyReturnInstruction:
+    key_label: str
     key_id: int
     room_number: int
 
@@ -78,8 +80,8 @@ def get_key_return_instruction(database_path, telegram_user_id):
     if instruction is None:
         return None
 
-    key_id, room_number = instruction
-    return KeyReturnInstruction(key_id=key_id, room_number=room_number)
+    key_id,key_name,owner_room_number = instruction
+    return KeyReturnInstruction(Key(key_id=key_id,name=key_name).label,key_id, owner_room_number)
 
 def user_currently_holds_key(database_path, telegram_user_id, key_id):
     if telegram_user_id is None:
@@ -130,3 +132,8 @@ def give_key_to_member(database_path, key_id, telegram_user_id):
 
     change_key_holder(database_path, key_id, member.id)
     return GiveKeyResult(status=GiveKeyStatus.GIVEN, member=member)
+
+def get_key_label(database_path, key_id: int) -> str:
+    """Resolve a key's display label; unknown IDs have no name to display."""
+    keys = query_key_table(database_path, Key(key_id=key_id))
+    return keys[0].label if keys else str(key_id)

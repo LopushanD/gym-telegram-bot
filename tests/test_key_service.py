@@ -67,11 +67,14 @@ class KeyServiceTests(unittest.TestCase):
     def test_get_key_return_instruction_returns_held_key_and_mailbox_room(self):
         with patch(
             "src.key_service.get_key_return_instruction_info",
-            return_value=(2, 4321),
+            return_value=(2, "Red", 4321),
         ) as get_instruction:
             instruction = get_key_return_instruction("database.sqlite3", 123)
 
-        self.assertEqual(KeyReturnInstruction(key_id=2, room_number=4321), instruction)
+        self.assertEqual(
+            KeyReturnInstruction(key_label="2 (Red)", key_id=2, room_number=4321),
+            instruction,
+        )
         get_instruction.assert_called_once_with("database.sqlite3", 123)
 
     def test_get_key_return_instruction_returns_none_when_user_holds_no_key(self):

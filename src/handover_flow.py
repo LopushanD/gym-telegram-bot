@@ -3,6 +3,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from telegram import CallbackQuery, Message
+from src.key_service import get_key_label
 from src.bot_replies import edit_to_holder_handover_cancel, edit_to_start_state
 from src import messages
 from src.config import DATABASE_PATH, HANDOVER_WINDOW_SECONDS
@@ -80,7 +81,7 @@ async def handle_key_handover(key_id,query: CallbackQuery,message: Message,state
     if not user_currently_holds_key(DATABASE_PATH, telegram_user_id, key_id):
         reply = messages.HANDOVER_HOLDER_BLOCKED_TEXT
     elif key_id in PENDING_HANDOVERS:
-        reply = messages.HANDOVER_HOLDER_PENDING_TEXT.format(key_id=key_id)
+        reply = messages.HANDOVER_HOLDER_PENDING_TEXT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     else:
         holder = get_gym_member_by_telegram_user_id(DATABASE_PATH,telegram_user_id)
         start_pending_handover(key_id,holder,message,state_change_function)
@@ -103,7 +104,7 @@ async def handle_pending_handover_obtained_backend(key_id,query: CallbackQuery,m
     if telegram_user_id is None:
         reply = messages.AUTH_USER_MISSING_TEXT
     elif pending_handover is None:
-        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT.format(key_id=key_id)  
+        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     elif telegram_user_id == pending_handover.holder.telegram_user_id:
         reply = messages.HANDOVER_RECEIVER_SELF_TEXT
     if reply is not None:
@@ -124,7 +125,7 @@ async def handle_pending_handover_confirmation(key_id,query: CallbackQuery,messa
     member = None
     pending_handover = get_pending_handover(key_id)
     if pending_handover is None:
-        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT.format(key_id=key_id)
+        reply = messages.HANDOVER_RECEIVER_MISSING_TEXT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     elif telegram_user_id is None:
         reply = messages.AUTH_USER_MISSING_TEXT
     else:
@@ -152,7 +153,7 @@ async def complete_handover_interaction(
     pending_handover.timeout_task.cancel()
     handover_text = messages.HANDOVER_BOTH_COMPLETED_TEXT.format(
         from_member=pending_handover.holder.full_name,
-        key_id=key_id,
+        key_id=get_key_label(DATABASE_PATH, key_id),
         to_member=receiver.full_name,
     )
     await pending_handover.state_change_function(
