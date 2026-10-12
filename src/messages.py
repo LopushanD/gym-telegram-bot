@@ -53,13 +53,17 @@ ADMIN_SET_ADMIN_USAGE_TEXT = "Usage: /setadmin telegram_id True/False"
 ADMIN_SET_ADMIN_BAD_VALUE_TEXT = "Telegram ID must be a positive integer; admin status must be True or False."
 ADMIN_SET_ADMIN_NOT_FOUND_TEXT = "There's no user with Telegram ID {telegram_user_id}."
 ADMIN_SET_ADMIN_COMPLETED_TEXT = "Updated user admin status. Now user data looks like\n{member}"
-ADMIN_GIVE_KEY_USAGE_TEXT = "Usage: /givekey key_id telegram_id"
+ADMIN_GIVE_KEY_USAGE_TEXT = "Usage: /givekey key_id telegram_id [-m/--mailbox True/False, defaults to False]"
 ADMIN_CHANGE_KEY_OWNER_USAGE_TEXT = "Usage: /keychangeowner key_id telegram_id"
 ADMIN_CHANGE_KEY_OWNER_USER_NOT_REGISTERED_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
 ADMIN_CHANGE_KEY_OWNER_COMPLETED_TEXT = "Recorded: key {key_id} is now owned by {member} (Telegram ID {telegram_user_id})."
 ADMIN_GIVE_KEY_USER_NOT_REGISTERED_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
 KEY_NOT_FOUND_TEXT = "Key {key_id} does not exist."
-ADMIN_GIVE_KEY_COMPLETED_TEXT = "Recorded: key {key_id} was given to {member} (Telegram ID {telegram_user_id})."
+ADMIN_GIVE_KEY_COMPLETED_TEXT = "Recorded: key {key_id} was given to {member}."
+ADMIN_GIVE_KEY_MAILBOX_COMPLETED_TEXT = (
+    "Recorded: key {key_id} was placed in {member}'s mailbox"
+    ", room {room_number}."
+)
 ADMIN_ADD_USER_USAGE_TEXT = "Usage: /adduser telegram_id name surname room telegram_name"
 ADMIN_ADD_USER_ALREADY_EXISTS_TEXT = "A gym member with Telegram ID {telegram_user_id} already exists."
 ADMIN_ADD_USER_COMPLETED_TEXT = "Added gym member {member} (Telegram ID {telegram_user_id}), room {room_number}."
@@ -86,19 +90,25 @@ def mailbox_receiver_take_prompt(key: Key) -> str:
 
 
 def current_key_holder_text(holder: KeyHolder) -> str:
+    key = holder.key
     member = holder.member
-    text = (
-        f"Key {holder.label} is currently held by {member.full_name}, "
-        f"room {member.room_number}."
-    )
+    if key.is_in_mailbox:
+        text = f"Key {key.label} is in {member.full_name}'s mailbox, room {member.room_number}."
+    else:
+        text = (
+            f"Key {key.label} is currently held by {member.full_name}, "
+            f"room {member.room_number}."
+        )
     if member.telegram_name is not None:
         text += f"\nTelegram name: {member.telegram_name}"
     return text
 
 def key_status_text(key: Key,holder:GymMember,owner:GymMember) -> str:
+    location = "mailbox" if key.is_in_mailbox else "member's hands"
     return gym_member_record_separator.join(
         (
-            f"Key: {key.label}\nActive: {'yes' if key.is_active else 'no'}",
+            f"Key: {key.label}\nActive: {'yes' if key.is_active else 'no'}\n"
+            f"Location: {location}",
             f"Current holder\n\n{process_gym_member_records([holder],gym_member_record_separator,True,True,True)[0]}",
             f"Owner\n\n{process_gym_member_records([owner],gym_member_record_separator,True,True,True)[0]}"
         )

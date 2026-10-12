@@ -186,6 +186,44 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
         )
         give_key.assert_not_called()
 
+    async def test_mailbox_assignment_rejects_unregistered_or_non_admin_requester(self):
+        for requester, reply in (
+            (None, messages.AUTH_USER_UNREGISTERED_TEXT),
+            (build_member(100), messages.ADMIN_COMMAND_FORBIDDEN_TEXT),
+        ):
+            with self.subTest(requester=requester):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id", return_value=requester),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(
+                        self.update, SimpleNamespace(args=["1", "200", "--mailbox", "True"])
+                    )
+                self.message.reply_text.assert_awaited_once_with(reply)
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
+
+    async def test_help_ignores_transfer_arguments_without_changing_state(self):
+        for help_option in ("-h", "--help"):
+            with self.subTest(help_option=help_option):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(self.update, SimpleNamespace(
+                        args=["invalid-key", "200", "--mailbox", "invalid-boolean", help_option]
+                    ))
+                self.message.reply_text.assert_awaited_once_with(
+                    load_command_documentation(GIVE_KEY_ADMIN_COMMAND), parse_mode="MarkdownV2"
+                )
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
+
     async def test_rejects_invalid_arguments(self):
         with (
             patch(
@@ -264,7 +302,7 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(args=["1", "200"]),
             )
 
-        give_key.assert_called_once_with(DATABASE_PATH, 1, 200)
+        give_key.assert_called_once_with(DATABASE_PATH, 1, 200, is_in_mailbox=False)
         cancel_handover.assert_called_once_with(1)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_GIVE_KEY_COMPLETED_TEXT.format(
@@ -273,6 +311,73 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
                 telegram_user_id=200,
             ),
         )
+
+    async def test_accepts_both_mailbox_options_and_boolean_values(self):
+        target_member = build_member(200)
+        for option, value, expected in (
+            ("-m", "True", True), ("--mailbox", "tRuE", True),
+            ("-m", "False", False), ("--mailbox", "FALSE", False),
+        ):
+            with self.subTest(option=option, value=value):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member",
+                          return_value=GiveKeyResult(GiveKeyStatus.GIVEN, target_member)) as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(
+                        self.update, SimpleNamespace(args=["1", "200", option, value])
+                    )
+                give_key.assert_called_once_with(DATABASE_PATH, 1, 200, is_in_mailbox=expected)
+                cancel_handover.assert_called_once_with(1)
+                template = (
+                    messages.ADMIN_GIVE_KEY_MAILBOX_COMPLETED_TEXT
+                    if expected else messages.ADMIN_GIVE_KEY_COMPLETED_TEXT
+                )
+                self.message.reply_text.assert_awaited_once_with(template.format(
+                    key_id=1, member=target_member.full_name, telegram_user_id=200,
+                    room_number=target_member.room_number,
+                ))
+
+    async def test_rejects_missing_unknown_or_duplicate_mailbox_options(self):
+        for arguments in (
+            [], ["1"], ["1", "200", "-m"],
+            ["1", "200", "--unknown", "True"],
+            ["1", "200", "-m", "True", "--mailbox", "False"],
+        ):
+            with self.subTest(arguments=arguments):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(self.update, SimpleNamespace(args=arguments))
+                self.message.reply_text.assert_awaited_once_with(messages.ADMIN_GIVE_KEY_USAGE_TEXT)
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
+
+    async def test_rejects_invalid_mailbox_values_and_non_positive_ids(self):
+        for arguments in (
+            ["1", "200", "-m", "1"], ["1", "200", "--mailbox", "yes"],
+            ["1", "200", "--mailbox", ""], ["0", "200", "-m", "True"],
+            ["1", "-200", "--mailbox", "False"],
+        ):
+            with self.subTest(arguments=arguments):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(self.update, SimpleNamespace(args=arguments))
+                self.message.reply_text.assert_awaited_once_with(messages.ADMIN_BAD_VALUE_TEXT)
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
 
 
 class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):

@@ -14,15 +14,15 @@ from src.key_service import (
 
 
 class ReturnToMailboxTests(unittest.TestCase):
-    def test_return_key_to_mailbox_updates_holder_to_mailbox_member(self):
+    def test_return_key_to_mailbox_updates_holder_to_owner_and_sets_mailbox_flag(self):
         with (
             patch("src.key_service.user_currently_holds_key", return_value=True),
             patch(
                 "src.key_service.get_key_owner_mailbox_info",
                 return_value=GymMember(
                     id=1,
-                    telegram_user_id=0,
-                    name="Mailbox",
+                    telegram_user_id=789,
+                    name="Ada",
                     surname="Owner",
                     room_number=1234,
                     telegram_name=None,
@@ -34,7 +34,7 @@ class ReturnToMailboxTests(unittest.TestCase):
             result = return_key_to_mailbox("database.sqlite3", 123, key_id=1)
 
         self.assertEqual(ReturnToMailboxStatus.RETURNED, result.status)
-        change_key_holder.assert_called_once_with("database.sqlite3", 1, 1)
+        change_key_holder.assert_called_once_with("database.sqlite3", 1, 1, is_in_mailbox=True)
 
     def test_return_key_to_mailbox_rejects_non_holder(self):
         with (

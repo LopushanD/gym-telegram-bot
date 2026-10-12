@@ -44,7 +44,8 @@ class ActiveKeySelectionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_active_query_preserves_ids_and_member_references(self):
         self.assertCountEqual(
-            [Key(2, 2, 1, True, "Unnamed"), Key(9, 2, 1, True, "Unnamed")],
+            [Key(2, 2, 1, True, "Unnamed", is_in_mailbox=False),
+             Key(9, 2, 1, True, "Unnamed", is_in_mailbox=False)],
             get_active_keys(self.database_path),
         )
 
@@ -104,7 +105,7 @@ class ActiveKeySelectionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_mailbox_pickup_records_active_key_and_rejects_invalid_choices(self):
         with database_connection(self.database_path) as connection:
-            connection.execute("UPDATE keys SET current_holder_id = 1 WHERE id = 2")
+            connection.execute("UPDATE keys SET current_holder_id = 1, is_in_mailbox = 1 WHERE id = 2")
 
         self.assertEqual(
             TakeFromMailboxStatus.KEY_NOT_FOUND,
@@ -125,14 +126,25 @@ class ActiveKeySelectionTests(unittest.IsolatedAsyncioTestCase):
 
         with database_connection(self.database_path) as connection:
             keys = connection.execute(
-                "SELECT id, current_holder_id FROM keys ORDER BY id"
+                "SELECT id, current_holder_id, owner_member_id, is_in_mailbox FROM keys ORDER BY id"
             ).fetchall()
             history = connection.execute(
                 "SELECT key_id, holder_id FROM key_holder_history"
             ).fetchall()
 
-        self.assertEqual([(2, 2), (5, 2), (9, 2)], keys)
+        self.assertEqual([(2, 2, 1, 0), (5, 2, 1, 0), (9, 2, 1, 0)], keys)
         self.assertEqual([(2, 2)], history)
+
+    def test_inactive_mailbox_key_rejects_pickup_without_changing_location(self):
+        with database_connection(self.database_path) as connection:
+            connection.execute("UPDATE keys SET current_holder_id = 1, is_in_mailbox = 1 WHERE id = 5")
+        result = take_key_from_mailbox(self.database_path, 200, 5)
+        self.assertEqual(TakeFromMailboxStatus.KEY_NOT_FOUND, result.status)
+        with database_connection(self.database_path) as connection:
+            self.assertEqual((1, 1, 1, 0), connection.execute(
+                "SELECT current_holder_id, owner_member_id, is_in_mailbox, is_active FROM keys WHERE id = 5"
+            ).fetchone())
+            self.assertEqual([], connection.execute("SELECT * FROM key_holder_history").fetchall())
 
     async def test_status_command_formats_real_holder_and_owner_for_inactive_key(self):
         message = SimpleNamespace(reply_text=AsyncMock())

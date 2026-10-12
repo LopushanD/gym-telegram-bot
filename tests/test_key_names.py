@@ -37,8 +37,8 @@ class KeyNameTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.label, key.label)
         self.assertEqual("Red", get_active_keys(self.path)[0].name)
         self.assertEqual("Red", get_key_status(self.path, self.key_id)[0].name)
-        self.assertEqual("Red", get_current_keyholder_info(self.path, self.key_id).key_name)
-        self.assertEqual("Red", get_all_current_keyholders_info(self.path)[0].key_name)
+        self.assertEqual("Red", get_current_keyholder_info(self.path, self.key_id).key.name)
+        self.assertEqual("Red", get_all_current_keyholders_info(self.path)[0].key.name)
         self.assertEqual(self.label, get_key_label(self.path, self.key_id))
         self.assertEqual("999", get_key_label(self.path, 999))
 
@@ -109,7 +109,7 @@ class KeyNameTests(unittest.IsolatedAsyncioTestCase):
         initialize_database(legacy)
         initialize_database(legacy)
         with database_connection(legacy) as connection:
-            self.assertEqual((7, 10, 20, 1, "Unnamed"),
+            self.assertEqual((7, 10, 20, 1, "Unnamed", 0),
                              connection.execute("SELECT * FROM keys").fetchone())
             self.assertEqual((1, 7, 10, "2026-01-01 12:00:00"),
                              connection.execute("SELECT * FROM key_holder_history").fetchone())

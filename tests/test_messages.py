@@ -14,7 +14,7 @@ from src.command_handlers_utility import process_key_history_records
 class MessageTests(unittest.TestCase):
     def test_current_key_holder_text_includes_contact_details_when_present(self):
         holder = KeyHolder(
-            key_id=1,
+            key=Key(key_id=1, is_in_mailbox=False),
             member=GymMember(
                 id=10,
                 telegram_user_id=123,
@@ -36,7 +36,7 @@ class MessageTests(unittest.TestCase):
 
     def test_current_key_holder_text_skips_missing_contact_details(self):
         holder = KeyHolder(
-            key_id=1,
+            key=Key(key_id=1, is_in_mailbox=False),
             member=GymMember(
                 id=10,
                 telegram_user_id=123,

@@ -6,7 +6,7 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.models import GymMember, KeyHolder
+from src.models import GymMember, KeyHolder, Key
 from src.key_service import (
     GiveKeyStatus,
     HandoverStatus,
@@ -16,6 +16,7 @@ from src.key_service import (
     get_key_return_instruction,
     can_start_key_handover,
     user_currently_holds_key,
+    user_currently_holds_any_key,
 )
 
 
@@ -36,7 +37,7 @@ class KeyServiceTests(unittest.TestCase):
             "src.key_service.get_all_current_keyholders_info",
             return_value=[
                 KeyHolder(
-                    key_id=1,
+                    key=Key(key_id=1, is_in_mailbox=False),
                     member=GymMember(
                         id=10,
                         telegram_user_id=123,
@@ -52,7 +53,7 @@ class KeyServiceTests(unittest.TestCase):
             holders = get_keyholders("database.sqlite3")
 
         holder = holders[0]
-        self.assertEqual(1, holder.key_id)
+        self.assertEqual(1, holder.key.key_id)
         self.assertEqual("Dima", holder.member.name)
         self.assertEqual("Ivanov", holder.member.surname)
         self.assertEqual(1234, holder.member.room_number)
@@ -94,7 +95,7 @@ class KeyServiceTests(unittest.TestCase):
         with patch(
             "src.key_service.get_current_keyholder_info",
             return_value=KeyHolder(
-                key_id=1,
+                key=Key(key_id=1, is_in_mailbox=False),
                 member=GymMember(
                     id=10,
                     telegram_user_id=123,
@@ -122,6 +123,29 @@ class KeyServiceTests(unittest.TestCase):
         self.assertFalse(is_holder)
         get_current_keyholder_info.assert_not_called()
 
+    def test_user_currently_holds_key_rejects_missing_holder_or_mailbox_location(self):
+        for holder in (None, KeyHolder(Key(key_id=1, is_in_mailbox=True), self.member)):
+            with self.subTest(holder=holder):
+                with patch("src.key_service.get_current_keyholder_info", return_value=holder):
+                    self.assertFalse(user_currently_holds_key("database.sqlite3", 123, 1))
+
+    def test_user_currently_holds_any_key_checks_physical_possession(self):
+        mailbox_key = KeyHolder(Key(key_id=1, is_in_mailbox=True), self.member)
+        held_key = KeyHolder(Key(key_id=2, is_in_mailbox=False), self.member)
+        for holders, expected in (
+            ([], False), ([mailbox_key], False), ([held_key], True),
+            ([mailbox_key, held_key], True),
+        ):
+            with self.subTest(holders=holders):
+                with patch("src.key_service.get_all_current_keyholders_info", return_value=holders) as lookup:
+                    self.assertIs(user_currently_holds_any_key("database.sqlite3", 123), expected)
+                lookup.assert_called_once_with("database.sqlite3", 123)
+
+    def test_user_currently_holds_any_key_returns_false_without_telegram_id(self):
+        with patch("src.key_service.get_all_current_keyholders_info") as lookup:
+            self.assertFalse(user_currently_holds_any_key("database.sqlite3", None))
+        lookup.assert_not_called()
+
     def test_start_key_handover_returns_ready_for_current_holder(self):
         with patch("src.key_service.user_currently_holds_key", return_value=True):
             result = can_start_key_handover("database.sqlite3", 123, key_id=1)
@@ -147,7 +171,19 @@ class KeyServiceTests(unittest.TestCase):
 
         self.assertEqual(GiveKeyStatus.GIVEN, result.status)
         self.assertEqual(self.member, result.member)
-        change_key_holder.assert_called_once_with("database.sqlite3", 1, self.member.id)
+        change_key_holder.assert_called_once_with("database.sqlite3", 1, self.member.id, is_in_mailbox=False)
+
+    def test_give_key_to_member_forwards_mailbox_destination(self):
+        with (
+            patch("src.key_service.get_gym_member_by_telegram_user_id", return_value=self.member),
+            patch("src.key_service.get_current_keyholder_info", return_value=object()),
+            patch("src.key_service.change_key_holder") as change_key_holder,
+        ):
+            result = give_key_to_member("database.sqlite3", 1, 123, is_in_mailbox=True)
+
+        self.assertEqual(GiveKeyStatus.GIVEN, result.status)
+        self.assertEqual(self.member, result.member)
+        change_key_holder.assert_called_once_with("database.sqlite3", 1, self.member.id, is_in_mailbox=True)
 
     def test_give_key_to_member_rejects_unregistered_member(self):
         with (

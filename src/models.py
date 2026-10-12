@@ -18,15 +18,6 @@ class GymMember:
     def full_name(self) -> str:
         return f"{self.name} {self.surname}"
 
-@dataclass(frozen=True)
-class KeyHolder:
-    key_id: int
-    member: GymMember
-    key_name: str = "Unnamed"
-
-    @property
-    def label(self) -> str:
-        return _format_key_label(self.key_id, self.key_name)
 
 @dataclass(frozen=False)
 class Key:
@@ -35,10 +26,16 @@ class Key:
     owner_member_id: int | None = None
     is_active: bool | None = None
     name: str | None = None
+    is_in_mailbox: bool | None = None
 
     @property
     def label(self) -> str:
         return _format_key_label(self.key_id, self.name)
+
+@dataclass(frozen=True)
+class KeyHolder:
+    key: Key
+    member: GymMember
 
 @dataclass(frozen=True)
 class KeyHistoryRecord:
