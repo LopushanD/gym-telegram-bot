@@ -56,6 +56,7 @@ def build_member(telegram_user_id: int, *, is_admin: bool = False) -> GymMember:
 
 class AdminCommandHelpTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -160,6 +161,7 @@ class AdminCommandHelpTests(unittest.IsolatedAsyncioTestCase):
 
 class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -183,6 +185,44 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
             messages.ADMIN_COMMAND_FORBIDDEN_TEXT,
         )
         give_key.assert_not_called()
+
+    async def test_mailbox_assignment_rejects_unregistered_or_non_admin_requester(self):
+        for requester, reply in (
+            (None, messages.AUTH_USER_UNREGISTERED_TEXT),
+            (build_member(100), messages.ADMIN_COMMAND_FORBIDDEN_TEXT),
+        ):
+            with self.subTest(requester=requester):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id", return_value=requester),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(
+                        self.update, SimpleNamespace(args=["1", "200", "--mailbox", "True"])
+                    )
+                self.message.reply_text.assert_awaited_once_with(reply)
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
+
+    async def test_help_ignores_transfer_arguments_without_changing_state(self):
+        for help_option in ("-h", "--help"):
+            with self.subTest(help_option=help_option):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(self.update, SimpleNamespace(
+                        args=["invalid-key", "200", "--mailbox", "invalid-boolean", help_option]
+                    ))
+                self.message.reply_text.assert_awaited_once_with(
+                    load_command_documentation(GIVE_KEY_ADMIN_COMMAND), parse_mode="MarkdownV2"
+                )
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
 
     async def test_rejects_invalid_arguments(self):
         with (
@@ -241,7 +281,7 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=999),
+            messages.KEY_NOT_FOUND_TEXT.format(key_id=999),
         )
 
     async def test_gives_key_and_reports_target_member(self):
@@ -262,7 +302,7 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(args=["1", "200"]),
             )
 
-        give_key.assert_called_once_with(DATABASE_PATH, 1, 200)
+        give_key.assert_called_once_with(DATABASE_PATH, 1, 200, is_in_mailbox=False)
         cancel_handover.assert_called_once_with(1)
         self.message.reply_text.assert_awaited_once_with(
             messages.ADMIN_GIVE_KEY_COMPLETED_TEXT.format(
@@ -272,9 +312,77 @@ class GiveKeyCommandTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+    async def test_accepts_both_mailbox_options_and_boolean_values(self):
+        target_member = build_member(200)
+        for option, value, expected in (
+            ("-m", "True", True), ("--mailbox", "tRuE", True),
+            ("-m", "False", False), ("--mailbox", "FALSE", False),
+        ):
+            with self.subTest(option=option, value=value):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member",
+                          return_value=GiveKeyResult(GiveKeyStatus.GIVEN, target_member)) as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(
+                        self.update, SimpleNamespace(args=["1", "200", option, value])
+                    )
+                give_key.assert_called_once_with(DATABASE_PATH, 1, 200, is_in_mailbox=expected)
+                cancel_handover.assert_called_once_with(1)
+                template = (
+                    messages.ADMIN_GIVE_KEY_MAILBOX_COMPLETED_TEXT
+                    if expected else messages.ADMIN_GIVE_KEY_COMPLETED_TEXT
+                )
+                self.message.reply_text.assert_awaited_once_with(template.format(
+                    key_id=1, member=target_member.full_name, telegram_user_id=200,
+                    room_number=target_member.room_number,
+                ))
+
+    async def test_rejects_missing_unknown_or_duplicate_mailbox_options(self):
+        for arguments in (
+            [], ["1"], ["1", "200", "-m"],
+            ["1", "200", "--unknown", "True"],
+            ["1", "200", "-m", "True", "--mailbox", "False"],
+        ):
+            with self.subTest(arguments=arguments):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(self.update, SimpleNamespace(args=arguments))
+                self.message.reply_text.assert_awaited_once_with(messages.ADMIN_GIVE_KEY_USAGE_TEXT)
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
+
+    async def test_rejects_invalid_mailbox_values_and_non_positive_ids(self):
+        for arguments in (
+            ["1", "200", "-m", "1"], ["1", "200", "--mailbox", "yes"],
+            ["1", "200", "--mailbox", ""], ["0", "200", "-m", "True"],
+            ["1", "-200", "--mailbox", "False"],
+        ):
+            with self.subTest(arguments=arguments):
+                self.message.reply_text.reset_mock()
+                with (
+                    patch("src.admin_command_handlers.get_gym_member_by_telegram_user_id",
+                          return_value=build_member(100, is_admin=True)),
+                    patch("src.admin_command_handlers.give_key_to_member") as give_key,
+                    patch("src.admin_command_handlers.cancel_pending_handover") as cancel_handover,
+                ):
+                    await give_key_command_handler(self.update, SimpleNamespace(args=arguments))
+                self.message.reply_text.assert_awaited_once_with(messages.ADMIN_BAD_VALUE_TEXT)
+                give_key.assert_not_called()
+                cancel_handover.assert_not_called()
+
 
 class AddUserCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -477,6 +585,7 @@ class UpdateUserArgumentTests(unittest.TestCase):
 
 class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -625,6 +734,7 @@ class UpdateUserCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -760,6 +870,7 @@ class UsersCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -799,7 +910,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
     async def test_uses_key_id_and_default_limit_and_replies_with_history(self):
         record = KeyHistoryRecord(
             event_id=1,
-            key_id=2,
+            key=Key(key_id=2),
             member=build_member(200),
             taken_at=datetime(2026, 6, 5, 12, 30),
         )
@@ -883,6 +994,7 @@ class KeyHistoryCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -929,7 +1041,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
 
         get_status.assert_called_once_with(DATABASE_PATH, 99)
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99),
+            messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
         )
 
     async def test_replies_with_complete_key_status(self):
@@ -955,6 +1067,7 @@ class KeyStatusCommandTests(unittest.IsolatedAsyncioTestCase):
 
 class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.enterContext(patch("src.admin_command_handlers.get_key_label", side_effect=lambda path, key_id: str(key_id)))
         self.message = SimpleNamespace(reply_text=AsyncMock())
         self.update = SimpleNamespace(
             effective_message=self.message,
@@ -1003,7 +1116,7 @@ class SetKeyActiveCommandTests(unittest.IsolatedAsyncioTestCase):
 
         set_active.assert_called_once_with(DATABASE_PATH, 99, True)
         self.message.reply_text.assert_awaited_once_with(
-            messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99),
+            messages.KEY_NOT_FOUND_TEXT.format(key_id=99),
         )
 
     async def test_activate_sets_key_active(self):

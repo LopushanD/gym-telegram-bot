@@ -33,17 +33,17 @@ class TakeFromMailboxKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
 
         self.assertEqual(4, len(rows))
-        self.assertEqual("1", rows[0][0].text)
+        self.assertEqual("1 (Unnamed)", rows[0][0].text)
         self.assertEqual(
             f"{RECEIVER_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX}:1",
             rows[0][0].callback_data,
         )
-        self.assertEqual("4", rows[1][0].text)
+        self.assertEqual("4 (Unnamed)", rows[1][0].text)
         self.assertEqual(
             f"{RECEIVER_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX}:4",
             rows[1][0].callback_data,
         )
-        self.assertEqual("9", rows[2][0].text)
+        self.assertEqual("9 (Unnamed)", rows[2][0].text)
         self.assertEqual(
             f"{RECEIVER_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX}:9",
             rows[2][0].callback_data,

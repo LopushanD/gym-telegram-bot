@@ -19,7 +19,7 @@ class TakeFromMailboxTests(unittest.TestCase):
             patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
             patch(
                 "src.key_service.get_key_status",
-                return_value=(Key(1, 7, 7, True), mailbox, mailbox),
+                return_value=(Key(1, 7, 7, True, is_in_mailbox=True), mailbox, mailbox),
             ) as get_key_status,
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
@@ -36,7 +36,7 @@ class TakeFromMailboxTests(unittest.TestCase):
             patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
             patch(
                 "src.key_service.get_key_status",
-                return_value=(Key(1, 8, 7, True), holder, mailbox),
+                return_value=(Key(1, 8, 7, True, is_in_mailbox=False), holder, mailbox),
             ),
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
@@ -62,7 +62,7 @@ class TakeFromMailboxTests(unittest.TestCase):
             patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
             patch(
                 "src.key_service.get_key_status",
-                return_value=(Key(1, 7, 7, False), mailbox, mailbox),
+                return_value=(Key(1, 7, 7, False, is_in_mailbox=True), mailbox, mailbox),
             ),
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):

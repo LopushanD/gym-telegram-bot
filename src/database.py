@@ -40,9 +40,11 @@ def _gym_member_from_row(row: sqlite3.Row, prefix: str|None = None) -> GymMember
 def _key_from_row(row: sqlite3.Row, prefix: str|None = None) -> Key:
     key = Key(
         key_id=row["key_id"] if prefix is None else row[f"{prefix}_key_id"],
-    current_holder_id=row["current_holder_id"] if prefix is None else row[f"{prefix}_current_holder_id"],
-    owner_member_id=row["owner_id"] if prefix is None else row[f"{prefix}_owner_id"],
-    is_active=row["is_active"] if prefix is None else row[f"{prefix}_is_active"]
+        name=row["key_name"] if prefix is None else row[f"{prefix}_key_name"],
+        current_holder_id=row["current_holder_id"] if prefix is None else row[f"{prefix}_current_holder_id"],
+        owner_member_id=row["owner_id"] if prefix is None else row[f"{prefix}_owner_id"],
+        is_active=bool(row["is_active"] if prefix is None else row[f"{prefix}_is_active"]),
+        is_in_mailbox=bool(row["is_in_mailbox"] if prefix is None else row[f"{prefix}_is_in_mailbox"]),
     )
     return key
 
@@ -90,7 +92,7 @@ TEST_MAILBOXES = (
 
 
 def initialize_database(database_path):
-    """Create the application database tables if they do not exist yet."""
+    """Create application tables and migrate existing key columns."""
     with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(
@@ -113,15 +115,25 @@ def initialize_database(database_path):
             """
             CREATE TABLE IF NOT EXISTS keys (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL DEFAULT 'Unnamed',
                 current_holder_id INTEGER NOT NULL,
                 owner_member_id INTEGER NOT NULL,
                 is_active INTEGER NOT NULL DEFAULT 1,
+                is_in_mailbox INTEGER NOT NULL DEFAULT 0 CHECK (is_in_mailbox IN (0, 1)),
                 created_at TIMESTAMP NOT NULL DEFAULT (datetime('now', 'localtime')),
                 FOREIGN KEY (current_holder_id) REFERENCES gym_members(id),
                 FOREIGN KEY (owner_member_id) REFERENCES gym_members(id)
             )
             """
         )
+        key_columns = {row[1] for row in connection.execute("PRAGMA table_info(keys)")}
+        if "name" not in key_columns:
+            connection.execute("ALTER TABLE keys ADD COLUMN name TEXT NOT NULL DEFAULT 'Unnamed'")
+        if "is_in_mailbox" not in key_columns:
+            connection.execute(
+                "ALTER TABLE keys ADD COLUMN is_in_mailbox INTEGER NOT NULL "
+                "DEFAULT 0 CHECK (is_in_mailbox IN (0, 1))"
+            )
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS key_holder_history (
@@ -136,7 +148,7 @@ def initialize_database(database_path):
             """
         )
 #TODO rewrite this function using general function that alters table based on query
-def change_key_holder(database_path, key_id, new_holder_id):
+def change_key_holder(database_path, key_id, new_holder_id, is_in_mailbox: bool = False):
     """Change a key holder and append the change to holder history."""
     with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
@@ -148,20 +160,20 @@ def change_key_holder(database_path, key_id, new_holder_id):
         if not holder_exists:
             raise ValueError(f"gym member does not exist: {new_holder_id}")
 
-        key_exists = connection.execute(
+        key = connection.execute(
             "SELECT 1 FROM keys WHERE id = ?",
             (key_id,),
         ).fetchone()
-        if not key_exists:
+        if key is None:
             raise ValueError(f"key does not exist: {key_id}")
 
         connection.execute(
             """
             UPDATE keys
-            SET current_holder_id = ?
+            SET current_holder_id = ?, is_in_mailbox = ?
             WHERE id = ?
             """,
-            (new_holder_id, key_id),
+            (new_holder_id, is_in_mailbox, key_id),
         )
         connection.execute(
             """
@@ -199,25 +211,35 @@ def get_key_owner_mailbox_info(database_path, key_id) -> GymMember | None:
 
 def get_key_return_instruction_info(database_path, telegram_user_id):
     query = """
-        SELECT keys.id, mailbox.room_number
+        SELECT 
+        keys.id AS key_id,
+        keys.name AS key_name,
+        mailbox.room_number AS owner_room_number
         FROM keys
         JOIN gym_members holder
             ON keys.current_holder_id = holder.id
         JOIN gym_members mailbox
             ON keys.owner_member_id = mailbox.id
-        WHERE holder.telegram_user_id = ?
+        WHERE holder.telegram_user_id = ? AND keys.is_in_mailbox = 0
         ORDER BY keys.id
         LIMIT 1
     """
     with database_connection(database_path) as connection:
         return connection.execute(query, [telegram_user_id]).fetchone()
+    
 #TODO use KeyHistoryRecord here, KeyHolder is just its subset
+#TODO use get_all_current_keyholders_info
 def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_member_id=None
                                ) -> KeyHolder | None:
     """Return the current holder details for a key, or None if the key is missing."""
     query = """
         SELECT
             keys.id AS key_id,
+            keys.name AS key_name,
+            keys.current_holder_id,
+            keys.owner_member_id AS owner_id,
+            keys.is_active,
+            keys.is_in_mailbox,
             gym_members.id AS member_id,
             gym_members.telegram_user_id,
             gym_members.name,
@@ -250,8 +272,9 @@ def get_current_keyholder_info(database_path,key_id,telegram_user_id=None,gym_me
         return None
 
     return KeyHolder(
-        key_id=holder["key_id"],
-        member=_gym_member_from_row(holder))
+        key=_key_from_row(holder),
+        member=_gym_member_from_row(holder),
+    )
 
 #TODO This function does almost the same as get-key_return_instruction_info. They could be combined into single fuction. 
 # Think about it
@@ -262,7 +285,7 @@ def get_key_id_by_telegram_user_id(database_path, telegram_user_id):
         FROM keys
         JOIN gym_members
             ON keys.current_holder_id = gym_members.id
-        WHERE gym_members.telegram_user_id = ?
+        WHERE gym_members.telegram_user_id = ? AND keys.is_in_mailbox = 0
     """
     with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
@@ -277,7 +300,11 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
     query = """
         SELECT
             keys.id AS key_id,
+            keys.name AS key_name,
+            keys.current_holder_id,
+            keys.owner_member_id AS owner_id,
             keys.is_active as is_active,
+            keys.is_in_mailbox,
             gym_members.id AS member_id,
             gym_members.telegram_user_id,
             gym_members.name,
@@ -313,7 +340,7 @@ def get_all_current_keyholders_info(database_path,telegram_user_id=None,gym_memb
 
     return [
         KeyHolder(
-            key_id=holder["key_id"],
+            key=_key_from_row(holder),
             member=_gym_member_from_row(holder),
         )
         for holder in holders
@@ -330,7 +357,9 @@ def get_key_status(database_path, key_id: int) -> tuple[Key,GymMember,GymMember]
     query = """
         SELECT
             keys.id AS key_id,
+            keys.name AS key_name,
             keys.is_active,
+            keys.is_in_mailbox,
             holder.id AS holder_member_id,
             holder.telegram_user_id AS holder_telegram_user_id,
             holder.name AS holder_name,
@@ -363,9 +392,11 @@ def get_key_status(database_path, key_id: int) -> tuple[Key,GymMember,GymMember]
 
     key = Key(
         key_id=row["key_id"],
+        name=row["key_name"],
         current_holder_id=row["holder_member_id"],
         owner_member_id=row["owner_member_id"],
-        is_active=bool(row["is_active"]))
+        is_active=bool(row["is_active"]),
+        is_in_mailbox=bool(row["is_in_mailbox"]))
     holder = _gym_member_from_row(row,"holder")
     owner = _gym_member_from_row(row,"owner")
     return (key,holder,owner)
@@ -414,7 +445,12 @@ def get_key_history(
     query = """
         SELECT
             history.event_id,
-            history.key_id,
+            keys.id AS key_id,
+            keys.current_holder_id AS current_holder_id,
+            keys.owner_member_id AS owner_id,
+            keys.is_active AS is_active,
+            keys.is_in_mailbox,
+            keys.name AS key_name,
             history.taken_at,
             members.id AS member_id,
             members.telegram_user_id,
@@ -426,6 +462,7 @@ def get_key_history(
             members.suspended_until,
             members.deleted_at
         FROM key_holder_history history
+        JOIN keys ON keys.id = history.key_id
         JOIN gym_members members ON members.id = history.holder_id
         WHERE history.key_id = ?
         ORDER BY history.taken_at DESC, history.event_id DESC
@@ -439,7 +476,7 @@ def get_key_history(
     return [
         KeyHistoryRecord(
             event_id=record["event_id"],
-            key_id=record["key_id"],
+            key=_key_from_row(record),
             member=_gym_member_from_row(record),
             taken_at=datetime.fromisoformat(record["taken_at"]),
         )
@@ -501,9 +538,11 @@ def query_key_table(database_path,querried_key:Key) -> list[Key]:
     query = """
     SELECT
        id as key_id,
+       name as key_name,
        current_holder_id as current_holder_id,
        owner_member_id as owner_id,
-       is_active as is_active
+       is_active as is_active,
+       is_in_mailbox
     FROM keys
     """
     #TODO make internal function what does this loop
@@ -703,8 +742,8 @@ def populate_test_mailboxes_and_keys(database_path):
             if existing_key is None:
                 key_id = connection.execute(
                     """
-                    INSERT INTO keys (current_holder_id, owner_member_id)
-                    VALUES (?, ?)
+                    INSERT INTO keys (current_holder_id, owner_member_id, is_in_mailbox)
+                    VALUES (?, ?, 1)
                     """,
                     (mailbox_member_id, mailbox_member_id),
                 ).lastrowid

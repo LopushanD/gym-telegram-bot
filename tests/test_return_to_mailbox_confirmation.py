@@ -20,6 +20,10 @@ from src.keyboards import (
 
 
 class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.enterContext(patch("src.bot_replies.user_currently_holds_any_key", return_value=False))
+        self.enterContext(patch("src.bot.get_key_label", side_effect=lambda path, key_id: str(key_id)))
+
     def make_query(self, callback_data=None):
         message = SimpleNamespace(edit_text=AsyncMock())
         query = SimpleNamespace(
@@ -65,7 +69,9 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
             patch.object(
                 bot,
                 "get_key_return_instruction",
-                return_value=KeyReturnInstruction(key_id=2, room_number=1234),
+                return_value=KeyReturnInstruction(
+                    key_label="2 (Red)", key_id=2, room_number=1234,
+                ),
             ) as get_key_return_instruction,
             patch.object(bot, "return_key_to_mailbox") as return_key_to_mailbox,
         ):
@@ -79,7 +85,7 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             (
                 messages.MAILBOX_HOLDER_RETURN_INSTRUCTION_TEXT.format(
-                    key_id=2,
+                    key_id="2 (Red)",
                     room_number=1234,
                 ),
             ),
@@ -88,6 +94,10 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("reply_markup", kwargs)
         keyboard = kwargs["reply_markup"].inline_keyboard
         self.assertEqual("Key returned", keyboard[0][0].text)
+        self.assertEqual(
+            f"{HOLDER_KEY_RETURN_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX}:2",
+            keyboard[0][0].callback_data,
+        )
         self.assertEqual("Cancel", keyboard[1][0].text)
 
     async def test_return_to_mailbox_first_click_blocks_without_return_instruction(self):
@@ -99,7 +109,7 @@ class ReturnToMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
         args, _ = message.edit_text.call_args
-        self.assertEqual((messages.MAILBOX_HOLDER_BLOCKED_TEXT,), args)
+        self.assertEqual((messages.MAILBOX_HOLDER_BLOCKED_TEXT.format(key_id="Unknown"),), args)
 
     async def test_return_to_mailbox_key_choice_asks_for_confirmation(self):
         query, message = self.make_query(

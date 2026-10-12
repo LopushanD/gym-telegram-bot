@@ -115,7 +115,7 @@ def build_key_obtained_receiver_key_choice_keyboard(keys: list[Key]) -> InlineKe
     keyboard = [
         [
             InlineKeyboardButton(
-                str(key.key_id),
+                key.label,
                 callback_data=handover_key_choice_callback(key.key_id),
             )
         ]
@@ -177,7 +177,7 @@ def build_key_obtained_mailbox_key_choice_keyboard(keys: list[Key]) -> InlineKey
     keyboard = [
         [
             InlineKeyboardButton(
-                str(key.key_id),
+                key.label,
                 callback_data=mailbox_key_choice_callback(key.key_id),
             )
         ]

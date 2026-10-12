@@ -1,4 +1,5 @@
 from telegram import Update
+from src.key_service import get_key_label
 from src import messages
 from src.config import DATABASE_PATH,LAST_N_RECORDS_DEFAULT,gym_member_record_separator
 from src.admin_commands import *
@@ -131,22 +132,16 @@ async def give_key_command_handler(update: Update, context) -> None:
         await reply_with_command_documentation(message, GIVE_KEY_ADMIN_COMMAND)
         return
 
-    if len(arguments) != 2:
+    try:
+        key_id, telegram_user_id, is_in_mailbox = parse_give_key_command_arguments(arguments)
+    except GiveKeyUsageError:
         await message.reply_text(messages.ADMIN_GIVE_KEY_USAGE_TEXT)
         return
-    #================
-    #TODO this block of code seems redundant and unnessesary
-    try:
-        key_id, telegram_user_id = (int(argument) for argument in arguments)
     except ValueError:
         await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
         return
 
-    if key_id <= 0 or telegram_user_id <= 0:
-        await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
-        return
-    #======================
-    result = give_key_to_member(DATABASE_PATH, key_id, telegram_user_id)
+    result = give_key_to_member(DATABASE_PATH, key_id, telegram_user_id, is_in_mailbox=is_in_mailbox)
     if result.status == GiveKeyStatus.USER_NOT_REGISTERED:
         reply = messages.ADMIN_GIVE_KEY_USER_NOT_REGISTERED_TEXT.format(
             telegram_user_id=telegram_user_id)
@@ -157,10 +152,16 @@ async def give_key_command_handler(update: Update, context) -> None:
             raise ValueError("given key result is missing the target member")
         # TODO why do we need to cancel pending handover? just to be sure?
         cancel_pending_handover(key_id)
-        reply = messages.ADMIN_GIVE_KEY_COMPLETED_TEXT.format(
-            key_id=key_id,
+        # so that we don't need to apply .format() to two separate cases
+        reply_template = (
+            messages.ADMIN_GIVE_KEY_MAILBOX_COMPLETED_TEXT
+            if is_in_mailbox else messages.ADMIN_GIVE_KEY_COMPLETED_TEXT
+        )
+        reply = reply_template.format(
+            key_id=get_key_label(DATABASE_PATH, key_id),
             member=result.member.full_name,
             telegram_user_id=telegram_user_id,
+            room_number=result.member.room_number,
         )
     else:
         raise ValueError(f"unsupported give key status: {result.status}")
@@ -203,7 +204,7 @@ async def change_key_owner_command_handler(update: Update, context) -> None:
 
     await message.reply_text(
         messages.ADMIN_CHANGE_KEY_OWNER_COMPLETED_TEXT.format(
-            key_id=key_id,
+            key_id=get_key_label(DATABASE_PATH, key_id),
             member=member.full_name,
             telegram_user_id=telegram_user_id,
         )
@@ -378,7 +379,7 @@ async def set_key_active_command_handler(
         messages.ADMIN_ACTIVATE_KEY_COMPLETED_TEXT
         if do_activate
         else messages.ADMIN_DEACTIVATE_KEY_COMPLETED_TEXT)
-    await message.reply_text(reply.format(key_id=key_id))
+    await message.reply_text(reply.format(key_id=get_key_label(DATABASE_PATH, key_id)))
     
 # Adapters to make handlers compatible with Telegram API
 async def activate_key_command_handler(update: Update, context) -> None:

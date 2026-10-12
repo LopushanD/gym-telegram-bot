@@ -6,7 +6,7 @@
 4\. Press _"Key returned"_\.
 5\. Press _"Confirm"_ only after the key is inside the mailbox\.
 
-After confirmation, the bot records the mailbox as the current holder of the key\.
+After confirmation, the bot records that the key is in the mailbox\.
 
 Important:
 \- Do not confirm before the key is physically inside the mailbox\.

@@ -4,6 +4,7 @@ from typing import cast
 from telegram import CallbackQuery, Message, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 
+from src.key_service import get_key_label
 from src import messages
 from src.admin_command_handlers import *
 from src.user_command_handlers import *
@@ -175,14 +176,14 @@ async def handle_key_return_mailbox(query: CallbackQuery, message: Message) -> N
         await edit_to_start_state(
             message,
             #TODO logically if we are not keyholder, we shouldn't even see this keyboard,handler
-            messages.MAILBOX_HOLDER_BLOCKED_TEXT,
+            messages.MAILBOX_HOLDER_BLOCKED_TEXT.format(key_id="Unknown"),
             get_callback_telegram_user_id(query),
         )
         return
 
     await message.edit_text(
         messages.MAILBOX_HOLDER_RETURN_INSTRUCTION_TEXT.format(
-            key_id=return_instruction.key_id,
+            key_id=return_instruction.key_label,
             room_number=return_instruction.room_number,
         ),
         reply_markup=build_key_return_mailbox_returned_keyboard(
@@ -197,7 +198,7 @@ async def handle_key_return_mailbox_choice(query: CallbackQuery, message: Messag
         HOLDER_KEY_RETURN_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX,
     )
     await message.edit_text(
-        messages.MAILBOX_HOLDER_RETURN_PROMPT.format(key_id=key_id),
+        messages.MAILBOX_HOLDER_RETURN_PROMPT.format(key_id=get_key_label(DATABASE_PATH, key_id)),
         reply_markup=build_key_return_mailbox_confirmation_keyboard(key_id),
     )
 
@@ -210,9 +211,9 @@ async def handle_key_return_mailbox_confirmation(query: CallbackQuery,message: M
     )
     result = return_key_to_mailbox(DATABASE_PATH, telegram_user_id, key_id)
     if result.status == ReturnToMailboxStatus.RETURNED:
-        reply = messages.MAILBOX_HOLDER_RETURNED_TEXT.format(key_id=key_id)
+        reply = messages.MAILBOX_HOLDER_RETURNED_TEXT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     else:
-        reply = messages.MAILBOX_HOLDER_BLOCKED_TEXT.format(key_id=key_id)
+        reply = messages.MAILBOX_HOLDER_BLOCKED_TEXT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     await edit_to_start_state(message,reply,telegram_user_id)
 
 async def handle_key_return_mailbox_cancellation(query: CallbackQuery,message: Message) -> None:
@@ -239,7 +240,7 @@ async def handle_key_obtained_from_mailbox_choice(query: CallbackQuery,message: 
         RECEIVER_MAILBOX_KEY_CHOICE_CALLBACK_PREFIX,
     )
     
-    message_text = messages.MAILBOX_RECEIVER_TAKE_PROMPT.format(key_id=key_id)
+    message_text = messages.MAILBOX_RECEIVER_TAKE_PROMPT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     await message.edit_text(
         message_text,
         reply_markup=build_key_obtained_mailbox_confirmation_keyboard(key_id)
@@ -253,11 +254,11 @@ async def handle_key_obtained_from_mailbox_confirmation(query: CallbackQuery,mes
         RECEIVER_MAILBOX_KEY_OBTAINED_CONFIRM_CALLBACK_PREFIX)
     result = take_key_from_mailbox(DATABASE_PATH,telegram_user_id,key_id)
     if result.status == TakeFromMailboxStatus.TAKEN:
-        reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT.format(key_id=key_id)
+        reply = messages.MAILBOX_RECEIVER_TAKEN_TEXT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     elif result.status == TakeFromMailboxStatus.KEY_NOT_FOUND:
         reply = messages.KEY_NOT_FOUND_TEXT.format(key_id=key_id)
     elif result.status == TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX:
-        reply = messages.MAILBOX_RECEIVER_EMPTY_TEXT.format(key_id=key_id)
+        reply = messages.MAILBOX_RECEIVER_EMPTY_TEXT.format(key_id=get_key_label(DATABASE_PATH, key_id))
     else:
         reply = messages.AUTH_USER_UNREGISTERED_TEXT
     await edit_to_start_state(message, reply, telegram_user_id)

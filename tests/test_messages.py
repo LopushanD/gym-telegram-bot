@@ -14,7 +14,7 @@ from src.command_handlers_utility import process_key_history_records
 class MessageTests(unittest.TestCase):
     def test_current_key_holder_text_includes_contact_details_when_present(self):
         holder = KeyHolder(
-            key_id=1,
+            key=Key(key_id=1, is_in_mailbox=False),
             member=GymMember(
                 id=10,
                 telegram_user_id=123,
@@ -36,7 +36,7 @@ class MessageTests(unittest.TestCase):
 
     def test_current_key_holder_text_skips_missing_contact_details(self):
         holder = KeyHolder(
-            key_id=1,
+            key=Key(key_id=1, is_in_mailbox=False),
             member=GymMember(
                 id=10,
                 telegram_user_id=123,
@@ -55,13 +55,13 @@ class MessageTests(unittest.TestCase):
     def test_key_history_record_text_describes_transfer(self):
         record = KeyHistoryRecord(
             event_id=5,
-            key_id=2,
+            key=Key(key_id=2),
             member=GymMember(10, 123, "Ada", "Lovelace", 1234, "@ada", False),
             taken_at=datetime(2026, 6, 5, 12, 30),
         )
 
         self.assertEqual(
-            ["2026-06-05 12:30:00 UTC: key 2 received by Ada Lovelace, room 1234 @ada"],
+            ["2026-06-05 12:30:00: key 2 (Unnamed) received by Ada Lovelace, room 1234 @ada"],
             process_key_history_records([record], "\n"),
         )
 
@@ -72,7 +72,7 @@ class MessageTests(unittest.TestCase):
 
         text = key_status_text(status, holder, owner)
 
-        self.assertIn("Key ID: 2", text)
+        self.assertIn("Key: 2 (Unnamed)", text)
         self.assertIn("Active: no", text)
         self.assertIn("Current holder", text)
         self.assertIn("Ada", text)

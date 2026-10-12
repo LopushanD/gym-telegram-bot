@@ -4,7 +4,7 @@ Command input format:
 Required inputs are written without brackets\.
 Optional inputs are written inside square brackets\.
 
-Each command has `-h` or `--help` option, which will show detailed description and usage of the corresponding command\.
+Each command has `-h` or `--help` option, which will show detailed description and usage of the corresponding command\. If this option is included, all other options are ignored\.
 
 If you enter a command that requires at least one input with no inputs, you will get a message with a short usage hint\.
 \=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=\=
@@ -20,14 +20,15 @@ Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`, `-t`
 List gym members matching the optional filters\.
 Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`\.
 
-`/givekey key_id telegram_id`
-Record that a registered gym member received a key\.
+`/givekey key_id telegram_id [-m/--mailbox True/False]`
+Record delivery to a registered member or their mailbox\.
+Use `-m` or `--mailbox` with `False` for the member themselves or `True` for their mailbox\. Defaults to `False`\.
 
 `/keyhistory key_id [last_n_records]`
 List recent _n_ holder changes for a key\. _n_ defaults to 5\.
 
 `/keystatus key_id`
-Show a key's current holder, owner, and active status\.
+Show a key's current holder, owner and active status\.
 
 `/keychangeowner key_id telegram_id`
 Change a key's owner\.

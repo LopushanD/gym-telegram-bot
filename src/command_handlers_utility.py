@@ -62,7 +62,7 @@ def process_key_history_records(records: list[KeyHistoryRecord],separator:str)->
 def _key_history_record_text(record: KeyHistoryRecord) -> str:
     return (
         f"{record.taken_at:%Y-%m-%d %H:%M:%S}: "
-        f"key {record.key_id} received by {record.member.full_name}, "
+        f"key {record.key.label} received by {record.member.full_name}, "
         f"room {record.member.room_number} "
         f"{record.member.telegram_name}"
     )
@@ -83,6 +83,27 @@ def is_help_request(arguments: list[str]) -> bool:
         if argument in HELP_OPTIONS:
             return True
     return False
+
+class GiveKeyUsageError(ValueError):
+    pass
+
+def parse_give_key_command_arguments(arguments: list[str]) -> tuple[int, int, bool]:
+    if len(arguments) not in (2, 4):
+        raise GiveKeyUsageError
+    if len(arguments) == 4 and arguments[2] not in ("-m", "--mailbox"):
+        raise GiveKeyUsageError
+
+    key_id, telegram_user_id = (int(argument) for argument in arguments[:2])
+    if key_id <= 0 or telegram_user_id <= 0:
+        raise ValueError("Key ID and Telegram ID must be positive")
+    #This parameter must default to False
+    is_in_mailbox = False
+    if len(arguments) == 4:
+        mailbox_value = arguments[3].lower()
+        if mailbox_value not in ("true", "false"):
+            raise ValueError("-m/--mailbox must be True or False")
+        is_in_mailbox = mailbox_value == "true"
+    return key_id, telegram_user_id, is_in_mailbox
 
 class UpdateUserUsageError(ValueError):
     pass

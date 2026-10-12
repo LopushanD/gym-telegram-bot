@@ -20,6 +20,9 @@ from src.keyboards import (
 
 
 class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.enterContext(patch("src.bot.get_key_label", side_effect=lambda path, key_id: str(key_id)))
+
     def make_query(self, callback_data=None):
         message = SimpleNamespace(edit_text=AsyncMock(), message_id=10, chat_id=20)
         query = SimpleNamespace(
@@ -67,8 +70,8 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((messages.KEY_CHOICE_PROMPT,), args)
         self.assertIn("reply_markup", kwargs)
         keyboard = kwargs["reply_markup"].inline_keyboard
-        self.assertEqual("1", keyboard[0][0].text)
-        self.assertEqual("4", keyboard[1][0].text)
+        self.assertEqual("1 (Unnamed)", keyboard[0][0].text)
+        self.assertEqual("4 (Unnamed)", keyboard[1][0].text)
         self.assertEqual("Cancel", keyboard[2][0].text)
 
     async def test_first_click_rejects_unregistered_user_before_showing_keys(self):
@@ -98,7 +101,7 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
         query.answer.assert_awaited_once_with()
         message.edit_text.assert_awaited_once()
         args, kwargs = message.edit_text.call_args
-        self.assertEqual((messages.mailbox_receiver_take_prompt(2),), args)
+        self.assertEqual((messages.MAILBOX_RECEIVER_TAKE_PROMPT.format(key_id=2),), args)
         self.assertIn("reply_markup", kwargs)
         keyboard = kwargs["reply_markup"].inline_keyboard
         self.assertEqual(
@@ -176,7 +179,7 @@ class TakeFromMailboxConfirmationTests(unittest.IsolatedAsyncioTestCase):
 
         query.answer.assert_awaited_once_with()
         edit_to_start_state.assert_awaited_once_with(
-            message, messages.KEY_NOT_ACTIVE_TEXT.format(key_id=99), 123
+            message, messages.KEY_NOT_FOUND_TEXT.format(key_id=99), 123
         )
 
     async def test_take_from_mailbox_confirm_reports_key_held_by_someone_else(self):
