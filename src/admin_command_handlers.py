@@ -1,5 +1,4 @@
 from telegram import Update
-from src.key_service import get_key_label
 from src import messages
 from src.config import DATABASE_PATH,LAST_N_RECORDS_DEFAULT,gym_member_record_separator
 from src.admin_commands import *
@@ -7,6 +6,7 @@ from src.command_handlers_utility import *
 from src.database import (
     GymMemberAlreadyExistsError,
     add_gym_member,
+    add_key,
     get_gym_member_by_telegram_user_id,
     query_gym_member_records,
     get_key_history,
@@ -17,7 +17,13 @@ from src.database import (
     update_gym_member,
 )
 from src.handover_flow import cancel_pending_handover
-from src.key_service import GiveKeyStatus, give_key_to_member
+from src.key_service import (
+    GiveKeyStatus,
+    KeyUpdateMemberNotFoundError,
+    get_key_label,
+    give_key_to_member,
+    update_key,
+)
 from src.telegram_helpers import get_update_telegram_user_id
 
 async def reply_with_command_documentation(message, command_name: str) -> None:
@@ -116,6 +122,44 @@ async def add_user_command_handler(update: Update, context) -> None:
             telegram_user_id=telegram_user_id,
             room_number=room_number)
     await message.reply_text(reply)
+
+async def add_key_command_handler(update: Update, context) -> None:
+    message = update.effective_message
+    if not await _user_is_admin(update):
+        return
+    arguments = getattr(context, "args", [])
+    if is_help_request(arguments):
+        await reply_with_command_documentation(message, ADD_KEY_ADMIN_COMMAND)
+        return
+    if not arguments or len(arguments) > 2:
+        await message.reply_text(messages.ADMIN_ADD_KEY_USAGE_TEXT)
+        return
+
+    try:
+        telegram_user_id = int(arguments[0])
+    except ValueError:
+        await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
+        return
+    name = str(arguments[1]) if len(arguments) == 2 else None
+    if telegram_user_id <= 0 or name == "":
+        await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
+        return
+
+    owner = get_gym_member_by_telegram_user_id(DATABASE_PATH, telegram_user_id)
+    if owner is None:
+        await message.reply_text(
+            messages.ADMIN_ADD_KEY_USER_NOT_REGISTERED_TEXT.format(telegram_user_id=telegram_user_id)
+        )
+        return
+
+    key_id = add_key(DATABASE_PATH, owner.id, name=name)
+    await message.reply_text(
+        messages.ADMIN_ADD_KEY_COMPLETED_TEXT.format(
+            key_id=get_key_label(DATABASE_PATH, key_id),
+            member=owner.full_name,
+            telegram_user_id=telegram_user_id,
+        )
+    )
 
 async def get_all_commands_handler(update: Update, context) -> None:
     message = update.effective_message
@@ -245,6 +289,45 @@ async def update_user_command_handler(update: Update, context) -> None:
         reply = messages.ADMIN_UPDATE_USER_COMPLETED_TEXT.format(
             telegram_user_id=member_update.telegram_user_id,
             changes=changes)
+    await message.reply_text(reply)
+
+
+async def update_key_command_handler(update: Update, context) -> None:
+    message = update.effective_message
+    if not await _user_is_admin(update):
+        return
+    arguments = getattr(context, "args", [])
+    if is_help_request(arguments):
+        await reply_with_command_documentation(message, UPDATE_KEY_ADMIN_COMMAND)
+        return
+
+    try:
+        key_update = parse_update_key_command_arguments(arguments, DATABASE_PATH)
+    except UpdateKeyUsageError:
+        await message.reply_text(messages.ADMIN_UPDATE_KEY_USAGE_TEXT)
+        return
+    except KeyUpdateMemberNotFoundError as error:
+        await message.reply_text(
+            messages.ADMIN_UPDATE_KEY_MEMBER_NOT_FOUND_TEXT.format(telegram_user_id=error.telegram_user_id)
+        )
+        return
+    except ValueError:
+        await message.reply_text(messages.ADMIN_BAD_VALUE_TEXT)
+        return
+
+    result = update_key(DATABASE_PATH, key_update)
+    if result is None:
+        await message.reply_text(messages.KEY_NOT_FOUND_TEXT.format(key_id=key_update.key_id))
+        return
+
+    before, after = result.key_before, result.key_after
+    if result.invalidates_pending_handover:
+        cancel_pending_handover(key_update.key_id)
+    changes = format_key_changes(before, after, DATABASE_PATH)
+    reply = (
+        messages.ADMIN_UPDATE_KEY_COMPLETED_TEXT.format(key_id=after.label, changes=changes)
+        if changes else messages.ADMIN_UPDATE_KEY_NO_CHANGES_TEXT.format(key_id=after.label)
+    )
     await message.reply_text(reply)
 
 async def users_command_handler(update: Update, context) -> None:

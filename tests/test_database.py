@@ -16,7 +16,6 @@ from src.database import (
     get_all_current_keyholders_info,
     get_current_keyholder_info,
     get_gym_member_by_telegram_user_id,
-    get_gym_member_id_by_telegram_user_id,
     query_gym_member_records,
     get_key_id_by_telegram_user_id,
     get_active_keys,
@@ -284,7 +283,7 @@ class DatabaseTests(unittest.TestCase):
                 ).fetchone()
                 history_record = connection.execute(
                     """
-                    SELECT key_id, holder_id
+                    SELECT key_id, holder_id, put_into_mailbox
                     FROM key_holder_history
                     WHERE key_id = ?
                     """,
@@ -292,7 +291,7 @@ class DatabaseTests(unittest.TestCase):
                 ).fetchone()
 
             self.assertEqual((second_holder_id,), current_holder_id)
-            self.assertEqual((key_id, second_holder_id), history_record)
+            self.assertEqual((key_id, second_holder_id, 0), history_record)
 
     def test_get_key_history_returns_latest_records_with_member_details(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -334,6 +333,7 @@ class DatabaseTests(unittest.TestCase):
             )
             self.assertEqual(second_holder_id, records[0].member.id)
             self.assertEqual(datetime(2026, 6, 2, 10, 0), records[0].taken_at)
+            self.assertIs(records[0].put_into_mailbox, False)
 
     def test_get_key_history_rejects_non_positive_limit(self):
         with self.assertRaises(ValueError):
@@ -721,37 +721,17 @@ class DatabaseTests(unittest.TestCase):
 
             self.assertIsNone(holder)
 
-    def test_get_gym_member_id_by_telegram_user_id_returns_member_id(self):
+    def test_get_gym_member_by_telegram_user_id_returns_none_when_missing(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            with closing(sqlite3.connect(database_path)) as connection, connection:
-                member_id = create_gym_member_with_telegram_user_id(
-                    connection,
-                    123456,
-                    "Ivanov",
-                    1234,
-                )
-
-            found_member_id = get_gym_member_id_by_telegram_user_id(
+            member = get_gym_member_by_telegram_user_id(
                 database_path,
                 123456,
             )
 
-            self.assertEqual(member_id, found_member_id)
-
-    def test_get_gym_member_id_by_telegram_user_id_returns_none_when_missing(self):
-        with tempfile.TemporaryDirectory() as directory:
-            database_path = Path(directory) / "test.sqlite3"
-            initialize_database(database_path)
-
-            member_id = get_gym_member_id_by_telegram_user_id(
-                database_path,
-                123456,
-            )
-
-            self.assertIsNone(member_id)
+            self.assertIsNone(member)
 
     def test_get_gym_member_by_telegram_user_id_returns_registered_member_data(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -980,9 +960,9 @@ class DatabaseTests(unittest.TestCase):
                 )
                 key_id = create_key(connection, holder_id)
 
-            self.assertTrue(set_key_active(database_path, key_id, False))
+            self.assertIs(set_key_active(database_path, key_id, False), True)
             self.assertFalse(get_key_status(database_path, key_id)[0].is_active)
-            self.assertTrue(set_key_active(database_path, key_id, True))
+            self.assertIs(set_key_active(database_path, key_id, True), True)
             self.assertTrue(get_key_status(database_path, key_id)[0].is_active)
 
     def test_set_key_active_returns_false_for_missing_key(self):
@@ -990,7 +970,7 @@ class DatabaseTests(unittest.TestCase):
             database_path = Path(directory) / "test.sqlite3"
             initialize_database(database_path)
 
-            self.assertFalse(set_key_active(database_path, 999, True))
+            self.assertIs(set_key_active(database_path, 999, True), False)
 
 
 if __name__ == "__main__":

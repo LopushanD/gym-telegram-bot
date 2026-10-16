@@ -67,6 +67,13 @@ ADMIN_GIVE_KEY_MAILBOX_COMPLETED_TEXT = (
 ADMIN_ADD_USER_USAGE_TEXT = "Usage: /adduser telegram_id name surname room telegram_name"
 ADMIN_ADD_USER_ALREADY_EXISTS_TEXT = "A gym member with Telegram ID {telegram_user_id} already exists."
 ADMIN_ADD_USER_COMPLETED_TEXT = "Added gym member {member} (Telegram ID {telegram_user_id}), room {room_number}."
+ADMIN_ADD_KEY_USAGE_TEXT = "Usage: /addkey owner_telegram_id [name]"
+#TODO there are multiple USER_NOT_REGISTERED_TEXT variables with same text
+# just with different prefix. Replace them by single variable with name mentioned above
+ADMIN_ADD_KEY_USER_NOT_REGISTERED_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
+ADMIN_ADD_KEY_COMPLETED_TEXT = (
+    "Added inactive key {key_id}, owned and held by {member} (Telegram ID {telegram_user_id})."
+)
 ADMIN_UPDATE_USER_USAGE_TEXT = (
     "Usage: /updateuser telegram_id option value [option value ...]\n"
     "Options: -n/--name, -s/--surname, -r/--room, "
@@ -75,6 +82,14 @@ ADMIN_UPDATE_USER_USAGE_TEXT = (
 ADMIN_UPDATE_USER_NOT_FOUND_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
 ADMIN_UPDATE_USER_NO_CHANGES_TEXT = "No user data changed for Telegram ID {telegram_user_id}."
 ADMIN_UPDATE_USER_COMPLETED_TEXT = "Updated gym member with Telegram ID {telegram_user_id}:\n{changes}"
+ADMIN_UPDATE_KEY_USAGE_TEXT = (
+    "Usage: /keyupdate key_id option value [option value ...]\n"
+    "Options: -c/--current-holder telegram_id, -o/--owner telegram_id, "
+    "-a/--activate True/False, -n/--name name, -m/--mailbox True/False"
+)
+ADMIN_UPDATE_KEY_MEMBER_NOT_FOUND_TEXT = "No gym member is registered with Telegram ID {telegram_user_id}."
+ADMIN_UPDATE_KEY_NO_CHANGES_TEXT = "No key data changed for key {key_id}."
+ADMIN_UPDATE_KEY_COMPLETED_TEXT = "Updated key {key_id}:\n{changes}"
 ADMIN_USERS_USAGE_TEXT = "Usage: /users [-n or --name Value] [-s or --surname Value] [-n or --room Value]"
 ADMIN_USERS_NOT_FOUND_TEXT = "No gym members matched the query."
 ADMIN_KEY_HISTORY_USAGE_TEXT = "Usage: /keyhistory key_id [last_n_records]"

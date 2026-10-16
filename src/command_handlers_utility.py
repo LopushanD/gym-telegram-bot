@@ -1,5 +1,7 @@
 from src.config import TELEGRAM_MESSAGE_LIMIT
-from src.models import GymMember, KeyHistoryRecord
+from src.models import GymMember, Key, KeyHistoryRecord
+from src.database import get_gym_member_by_telegram_user_id, query_gym_member_records
+from src.key_service import KeyUpdateMemberNotFoundError
 HELP_OPTIONS = {"-h", "--help"}
 GYM_MEMBER_OPTION_FIELDS = {
     "-n": "name",
@@ -16,6 +18,25 @@ GYM_MEMBER_FIELD_LABELS = {
     "surname": "Surname",
     "room_number": "Room",
     "telegram_name": "Telegram name",
+}
+KEY_OPTION_FIELDS = {
+    "-c": "current_holder_id",
+    "--current-holder": "current_holder_id",
+    "-o": "owner_member_id",
+    "--owner": "owner_member_id",
+    "-a": "is_active",
+    "--activate": "is_active",
+    "-n": "name",
+    "--name": "name",
+    "-m": "is_in_mailbox",
+    "--mailbox": "is_in_mailbox",
+}
+KEY_FIELD_LABELS = {
+    "current_holder_id": "Current holder Telegram ID",
+    "owner_member_id": "Owner Telegram ID",
+    "is_active": "Active",
+    "name": "Name",
+    "is_in_mailbox": "In mailbox",
 }
 
 def _split_record_texts(record_texts: list[str], separator: str) -> list[str]:
@@ -60,9 +81,10 @@ def process_key_history_records(records: list[KeyHistoryRecord],separator:str)->
 
 
 def _key_history_record_text(record: KeyHistoryRecord) -> str:
+    transfer = "put into mailbox of" if record.put_into_mailbox else "received by"
     return (
         f"{record.taken_at:%Y-%m-%d %H:%M:%S}: "
-        f"key {record.key.label} received by {record.member.full_name}, "
+        f"key {record.key.label} {transfer} {record.member.full_name}, "
         f"room {record.member.room_number} "
         f"{record.member.telegram_name}"
     )
@@ -76,7 +98,22 @@ def format_gym_member_changes(
         for field, label in GYM_MEMBER_FIELD_LABELS.items()
         if getattr(member_before, field) != getattr(member_after, field)
     )
-    
+
+def format_key_changes(key_before: Key, key_after: Key, database_path) -> str:
+    def display_value(key: Key, field: str):
+        value = getattr(key, field)
+        if field in ("current_holder_id", "owner_member_id"):
+            members = query_gym_member_records(database_path, GymMember(id=value))
+            if not members:
+                raise ValueError(f"Key references missing gym member {value}")
+            return members[0].telegram_user_id
+        return value
+
+    return "\n".join(
+        f"{label}: {display_value(key_before, field)} -> {display_value(key_after, field)}"
+        for field, label in KEY_FIELD_LABELS.items()
+        if getattr(key_before, field) != getattr(key_after, field)
+    )
 
 def is_help_request(arguments: list[str]) -> bool:
     for argument in arguments:
@@ -110,9 +147,7 @@ class UpdateUserUsageError(ValueError):
 def parse_update_user_command_arguments(arguments: list[str]) -> GymMember:
     if len(arguments) < 3 or len(arguments[1:]) % 2 != 0:
         raise UpdateUserUsageError
-    telegram_user_id = int(arguments[0])
-    if telegram_user_id <=0:
-        raise ValueError("Telegram ID must be positive")
+    telegram_user_id = _check_and_typecast_id(arguments[0],"Telegram ID")
     updates: dict[str, str | int] = {"telegram_user_id":telegram_user_id}
     for option, value in zip(arguments[1::2], arguments[2::2]):
         field = GYM_MEMBER_OPTION_FIELDS.get(option)
@@ -124,6 +159,40 @@ def parse_update_user_command_arguments(arguments: list[str]) -> GymMember:
                 raise ValueError(f"{field} must be positive")
         updates[field] = value
     return GymMember(**updates)
+
+class UpdateKeyUsageError(ValueError):
+    pass
+
+def _check_and_typecast_id(value: str, label: str) -> int:
+    identifier = int(value)
+    if not 0 < identifier <= 2**63 - 1:
+        raise ValueError(f"{label} must be a positive 64-bit integer")
+    return identifier
+
+def parse_update_key_command_arguments(arguments: list[str], database_path) -> Key:
+    if len(arguments) < 3 or len(arguments[1:]) % 2 != 0:
+        raise UpdateKeyUsageError
+    key_id = _check_and_typecast_id(arguments[0], "Key ID")
+    updates: dict[str, str | int | bool] = {"key_id": key_id}
+    for option, value in zip(arguments[1::2], arguments[2::2]):
+        field = KEY_OPTION_FIELDS.get(option)
+        if field is None or field in updates or value.startswith("-"):
+            raise UpdateKeyUsageError
+        if field in ("current_holder_id", "owner_member_id"):
+            telegram_id = _check_and_typecast_id(value, f"{option} Telegram ID")
+            member = get_gym_member_by_telegram_user_id(database_path, telegram_id)
+            if member is None:
+                raise KeyUpdateMemberNotFoundError(telegram_id)
+            value = member.id
+        elif field in ("is_active", "is_in_mailbox"):
+            if value.lower() not in ("true", "false"):
+                raise ValueError(f"{option} must be True or False")
+            value = value.lower() == "true"
+        elif not value.strip(): # at this point it can be only "name" field
+            raise ValueError("Key name must not be blank")
+        updates[field] = value
+    return Key(**updates) # matches parameters and values on it's own
+
 
 class UserCommandUsageError(ValueError):
     pass

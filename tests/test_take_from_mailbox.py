@@ -16,7 +16,7 @@ class TakeFromMailboxTests(unittest.TestCase):
     def test_take_key_from_mailbox_updates_holder_to_member(self):
         mailbox = GymMember(id=7, name="Key", surname="Mailbox")
         with (
-            patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
+            patch("src.key_service.get_gym_member_by_telegram_user_id", return_value=GymMember(id=42)),
             patch(
                 "src.key_service.get_key_status",
                 return_value=(Key(1, 7, 7, True, is_in_mailbox=True), mailbox, mailbox),
@@ -33,7 +33,7 @@ class TakeFromMailboxTests(unittest.TestCase):
         mailbox = GymMember(id=7)
         holder = GymMember(id=8)
         with (
-            patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
+            patch("src.key_service.get_gym_member_by_telegram_user_id", return_value=GymMember(id=42)),
             patch(
                 "src.key_service.get_key_status",
                 return_value=(Key(1, 8, 7, True, is_in_mailbox=False), holder, mailbox),
@@ -47,7 +47,7 @@ class TakeFromMailboxTests(unittest.TestCase):
 
     def test_take_key_from_mailbox_rejects_missing_key(self):
         with (
-            patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
+            patch("src.key_service.get_gym_member_by_telegram_user_id", return_value=GymMember(id=42)),
             patch("src.key_service.get_key_status", return_value=(None, None, None)),
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
@@ -59,7 +59,7 @@ class TakeFromMailboxTests(unittest.TestCase):
     def test_take_key_from_mailbox_rejects_inactive_key_from_old_button(self):
         mailbox = GymMember(id=7)
         with (
-            patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=42),
+            patch("src.key_service.get_gym_member_by_telegram_user_id", return_value=GymMember(id=42)),
             patch(
                 "src.key_service.get_key_status",
                 return_value=(Key(1, 7, 7, False, is_in_mailbox=True), mailbox, mailbox),
@@ -73,20 +73,20 @@ class TakeFromMailboxTests(unittest.TestCase):
 
     def test_take_key_from_mailbox_rejects_missing_telegram_user(self):
         with (
-            patch("src.key_service.get_gym_member_id_by_telegram_user_id") as get_member_id,
+            patch("src.key_service.get_gym_member_by_telegram_user_id") as get_member,
             patch("src.key_service.get_key_status") as get_key_status,
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):
             result = take_key_from_mailbox(self.database_path, None, key_id=1)
 
         self.assertEqual(TakeFromMailboxStatus.MISSING_TELEGRAM_USER, result.status)
-        get_member_id.assert_not_called()
+        get_member.assert_not_called()
         get_key_status.assert_not_called()
         change_key_holder.assert_not_called()
 
     def test_take_key_from_mailbox_rejects_unregistered_user(self):
         with (
-            patch("src.key_service.get_gym_member_id_by_telegram_user_id", return_value=None),
+            patch("src.key_service.get_gym_member_by_telegram_user_id", return_value=None),
             patch("src.key_service.get_key_status") as get_key_status,
             patch("src.key_service.change_key_holder") as change_key_holder,
         ):

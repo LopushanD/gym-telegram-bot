@@ -558,6 +558,8 @@ class UpdateUserArgumentTests(unittest.TestCase):
         for arguments in (
             ["not-an-id", "--name", "Ada"],
             ["0", "--name", "Ada"],
+            ["-1", "--name", "Ada"],
+            [str(2**63), "--name", "Ada"],
             ["200", "--room", "not-a-room"],
             ["200", "--room", "0"],
         ):

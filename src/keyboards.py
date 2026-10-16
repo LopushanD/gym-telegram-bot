@@ -67,7 +67,7 @@ def parse_key_id_callback(callback_data: str, prefix: str) -> int:
 def build_start_keyboard(include_holder_actions: bool = False) -> InlineKeyboardMarkup:
     keyboard=[]
     keyboard.append([InlineKeyboardButton("get start message", callback_data=GET_STARTING_MESSAGE_CALLBACK)])
-    keyboard.append([InlineKeyboardButton("Key holder info", callback_data=RECEIVER_KEY_INFO_CALLBACK)])
+    keyboard.append([InlineKeyboardButton("get keyholder info", callback_data=RECEIVER_KEY_INFO_CALLBACK)])
     if include_holder_actions:
         keyboard.extend([
             [

@@ -52,16 +52,30 @@ class MessageTests(unittest.TestCase):
 
         self.assertNotIn("Telegram name:", text)
 
-    def test_key_history_record_text_describes_transfer(self):
+    def test_key_history_record_text_describes_person_transfer_despite_current_mailbox_location(self):
         record = KeyHistoryRecord(
             event_id=5,
-            key=Key(key_id=2),
+            key=Key(key_id=2, is_in_mailbox=True),
             member=GymMember(10, 123, "Ada", "Lovelace", 1234, "@ada", False),
             taken_at=datetime(2026, 6, 5, 12, 30),
         )
 
         self.assertEqual(
             ["2026-06-05 12:30:00: key 2 (Unnamed) received by Ada Lovelace, room 1234 @ada"],
+            process_key_history_records([record], "\n"),
+        )
+
+    def test_key_history_record_text_describes_mailbox_transfer_despite_current_holder(self):
+        record = KeyHistoryRecord(
+            event_id=6,
+            key=Key(key_id=2, name="Red", is_in_mailbox=False),
+            member=GymMember(10, 123, "Ada", "Lovelace", 1234, "@ada", False),
+            taken_at=datetime(2026, 6, 5, 12, 30),
+            put_into_mailbox=True,
+        )
+
+        self.assertEqual(
+            ["2026-06-05 12:30:00: key 2 (Red) put into mailbox of Ada Lovelace, room 1234 @ada"],
             process_key_history_records([record], "\n"),
         )
 

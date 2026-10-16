@@ -1,20 +1,18 @@
 ---------- FIRST PRIORITY ----------
-- make it more specific in logger if key was taken/put back from/to mailbox or person.
+- remove /activatekey, /deactivatekey. Add /setkeyactive, it takes keyID, True/False that activates/deactivates key.
+        Adjust documentation and tests correspondingly.
+- think, if it's better to have fewer complex functions vs more simple ones (from usage perspective)
+- add QA section to bot.
 - get_current_keyholder_info seems redundant, as we have get_all_current_keyholders_info, which does same thing and more
         remove the former function and replace it with the latter one.
-- look at code associated buttons (the whole process). It seems to be clunky, change if needed.
-- remove /activatekey, /deactivatekey. Instead add /keyupdate that can update current_holder_id owner_member_id is_active name fields
-        command structure: /keyupdate key_id option value [option value ...] (very similar to /updateuser)
-        parameters: -c or --current-holder, -o or --owner, -a or --activate, -n or --name to update corresponding column
-        to activate or deactivate key True/False is used (just like in  /activatekey, /deactivatekey before that)
-- add /keyadd that adds key similarly /adduser
+---------- SECOND PRIORITY ----------
 - change /adduser to /useradd, /updateuser to /userupdate /givekey to /keygive.
         Only names are changed, functionality stays same.
-- add a logger that will be able to export logs that are sent to docker terminal by telegram (needed for debugging purposes)
-- commands that write to database should also be logged in a dedicated table.
-- make keyhistory logger more specific how key was obtained by a gym member.
----------- SECOND PRIORITY ----------
+- change "member" to "user" in code and messages (member is confusing, because not clear if AG member or regular one is meant)
 - for /users command add -a parameter that shows all information about users. By default it shows only name, surmane,room,telegram name
+- commands that write to database should also be logged in a dedicated table.
+- add a logger that will be able to export logs that are sent to docker terminal by telegram (needed for debugging purposes)
+- look at code associated buttons (the whole process). It seems to be clunky, change if needed.
 - add /deleteuser admin command. It sets deleted_at column to currect timestamp (if the column is not NULL, it means user was deleted)
 - change /keystatus so, that you can see multiple keys (make it similar to /users querry)
 - specify in all commands that having -h parameter calls documentation and ignores all other parameters 

@@ -10,10 +10,33 @@ from src.database import (
     get_all_current_keyholders_info,
     get_key_return_instruction_info,
     get_gym_member_by_telegram_user_id,
-    get_gym_member_id_by_telegram_user_id,
+
     get_key_owner_mailbox_info,
     query_key_table,
+    query_gym_member_records,
+    update_key_table,
 )
+
+class KeyUpdateMemberNotFoundError(ValueError):
+    def __init__(self, telegram_user_id: int):
+        self.telegram_user_id = telegram_user_id
+        super().__init__(f"No gym member is registered with Telegram ID {telegram_user_id}")
+
+
+@dataclass(frozen=True)
+class KeyUpdateResult:
+    key_before: Key
+    key_after: Key
+
+    @property
+    def invalidates_pending_handover(self) -> bool:
+        before, after = self.key_before, self.key_after
+        return (
+            before.current_holder_id != after.current_holder_id
+            or before.is_in_mailbox != after.is_in_mailbox
+            or (before.is_active is True and after.is_active is False)
+        )
+
 
 @dataclass(frozen=True)
 class KeyReturnInstruction:
@@ -112,15 +135,15 @@ def return_key_to_mailbox(database_path,telegram_user_id,key_id):
 def take_key_from_mailbox(database_path,telegram_user_id,key_id):
     if telegram_user_id is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.MISSING_TELEGRAM_USER)
-    member_id = get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id)
-    if member_id is None:
+    member = get_gym_member_by_telegram_user_id(database_path, telegram_user_id)
+    if member is None:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.USER_NOT_REGISTERED)
     key, _, _ = get_key_status(database_path, key_id)
     if key is None or not key.is_active:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_FOUND)
     if not key.is_in_mailbox:
         return TakeFromMailboxResult(status=TakeFromMailboxStatus.KEY_NOT_IN_MAILBOX)
-    change_key_holder(database_path, key_id, member_id)
+    change_key_holder(database_path, key_id, member.id)
     return TakeFromMailboxResult(status=TakeFromMailboxStatus.TAKEN)
 
 
@@ -135,6 +158,18 @@ def give_key_to_member(database_path, key_id, telegram_user_id, is_in_mailbox: b
 
     change_key_holder(database_path, key_id, member.id, is_in_mailbox=is_in_mailbox)
     return GiveKeyResult(status=GiveKeyStatus.GIVEN, member=member)
+
+def update_key(database_path, key_update: Key) -> KeyUpdateResult | None:
+    """Update a key after checking member references and record responsibility changes."""
+    #key is already checked at this point
+    keys = query_key_table(database_path, Key(key_id=key_update.key_id))
+    if not keys:
+        return None
+    updated_keys = update_key_table(database_path, key_update, record_holder_history=True)
+    if not updated_keys:
+        raise ValueError("Updated key was not found")
+    return KeyUpdateResult(keys[0], updated_keys[0])
+
 
 def get_key_label(database_path, key_id: int) -> str:
     """Resolve a key's display label; unknown IDs have no name to display."""

@@ -90,9 +90,8 @@ TEST_MAILBOXES = (
     },
 )
 
-
 def initialize_database(database_path):
-    """Create application tables and migrate existing key columns."""
+    """Create application tables and migrate existing key and history columns."""
     with database_connection(database_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(
@@ -141,12 +140,38 @@ def initialize_database(database_path):
                 key_id INTEGER NOT NULL,
                 holder_id INTEGER NOT NULL,
                 taken_at TIMESTAMP NOT NULL,
+                put_into_mailbox INTEGER NOT NULL DEFAULT 0 CHECK (put_into_mailbox IN (0, 1)),
 
                 FOREIGN KEY (key_id) REFERENCES keys(id),
                 FOREIGN KEY (holder_id) REFERENCES gym_members(id)
             )
             """
         )
+        history_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(key_holder_history)")
+        }
+        if "put_into_mailbox" not in history_columns:
+            connection.execute(
+                "ALTER TABLE key_holder_history ADD COLUMN put_into_mailbox INTEGER NOT NULL "
+                "DEFAULT 0 CHECK (put_into_mailbox IN (0, 1))"
+            )
+
+def add_key(database_path, owner_member_id: int, name: str | None = None) -> int:
+    """Create an inactive key held by its owner and return its generated ID."""
+    columns = ["current_holder_id", "owner_member_id", "is_active"]
+    values: list[int | str] = [owner_member_id, owner_member_id, 0]
+    if name is not None:
+        columns.append("name")
+        values.append(name)
+    placeholders = ", ".join("?" for _ in values)
+    with database_connection(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        cursor = connection.execute(
+            f"INSERT INTO keys ({', '.join(columns)}) VALUES ({placeholders})",
+            values,
+        )
+        return cursor.lastrowid
+
 #TODO rewrite this function using general function that alters table based on query
 def change_key_holder(database_path, key_id, new_holder_id, is_in_mailbox: bool = False):
     """Change a key holder and append the change to holder history."""
@@ -175,13 +200,19 @@ def change_key_holder(database_path, key_id, new_holder_id, is_in_mailbox: bool 
             """,
             (new_holder_id, is_in_mailbox, key_id),
         )
-        connection.execute(
-            """
-            INSERT INTO key_holder_history (key_id, holder_id, taken_at)
-            VALUES (?, ?, datetime('now', 'localtime'))
-            """,
-            (key_id, new_holder_id),
-        )
+        _record_key_holder_history(connection, key_id, new_holder_id, is_in_mailbox)
+
+
+def _record_key_holder_history(
+    connection: sqlite3.Connection, key_id: int, holder_id: int, is_in_mailbox: bool,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO key_holder_history (key_id, holder_id, taken_at, put_into_mailbox)
+        VALUES (?, ?, datetime('now', 'localtime'), ?)
+        """,
+        (key_id, holder_id, is_in_mailbox),
+    )
 
 def get_key_owner_mailbox_info(database_path, key_id) -> GymMember | None:
     query = """
@@ -401,35 +432,15 @@ def get_key_status(database_path, key_id: int) -> tuple[Key,GymMember,GymMember]
     owner = _gym_member_from_row(row,"owner")
     return (key,holder,owner)
 
-#TODO rewrite this function using general function that alters table based on query
 def set_key_owner(database_path, key_id: int, owner_member_id: int) -> bool:
     """Set a key's owner and return whether the key exists."""
-    with database_connection(database_path) as connection:
-        connection.execute("PRAGMA foreign_keys = ON")
-        cursor = connection.execute(
-            """
-            UPDATE keys
-            SET owner_member_id = ?
-            WHERE id = ?
-            """,
-            (owner_member_id, key_id),
-        )
-    return cursor.rowcount > 0
+    return bool(update_key_table(
+        database_path, Key(key_id=key_id, owner_member_id=owner_member_id)))
 
-#TODO rewrite this function using general function that alters table based on query
 def set_key_active(database_path, key_id: int, do_activate: bool) -> bool:
     """Set a key's active status and return whether the key exists."""
-    with database_connection(database_path) as connection:
-        cursor = connection.execute(
-            """
-            UPDATE keys
-            SET is_active = ?
-            WHERE id = ?
-            """,
-            (int(do_activate), key_id),
-        )
-    return cursor.rowcount > 0
-
+    return bool(update_key_table(
+        database_path, Key(key_id=key_id, is_active=do_activate)))
 
 def get_key_history(
     database_path,
@@ -452,6 +463,7 @@ def get_key_history(
             keys.is_in_mailbox,
             keys.name AS key_name,
             history.taken_at,
+            history.put_into_mailbox,
             members.id AS member_id,
             members.telegram_user_id,
             members.name,
@@ -479,16 +491,10 @@ def get_key_history(
             key=_key_from_row(record),
             member=_gym_member_from_row(record),
             taken_at=datetime.fromisoformat(record["taken_at"]),
+            put_into_mailbox=bool(record["put_into_mailbox"]),
         )
         for record in records
     ]
-
-def get_gym_member_id_by_telegram_user_id(database_path, telegram_user_id):
-    """Return the gym member id for a Telegram user, or None if absent."""
-    member = get_gym_member_by_telegram_user_id(database_path, telegram_user_id)
-    if member is None:
-        return None
-    return member.id
 
 def get_gym_member_by_telegram_user_id(database_path,telegram_user_id) -> GymMember | None:
     """
@@ -560,14 +566,51 @@ def query_key_table(database_path,querried_key:Key) -> list[Key]:
         fetched_keys = connection.execute(query, parameters).fetchall()
     return [_key_from_row(key) for key in fetched_keys]
 
+def update_key_table(
+    database_path, key: Key, record_holder_history: bool = False
+) -> list[Key]:
+    """Update supplied fields, optionally auditing holder/location changes atomically."""
+    if key.key_id is None:
+        raise ValueError("key_id is required to update a key")
+
+    fields = {
+        field: value
+        for field, value in vars(key).items()
+        if field != "key_id" and value is not None
+    }
+    if fields:
+        assignments = ", ".join(f"{field} = ?" for field in fields)
+        parameters = [*fields.values(), key.key_id]
+        with database_connection(database_path) as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            holder_before = None
+            if record_holder_history:
+                connection.execute("BEGIN IMMEDIATE")
+                holder_before = connection.execute(
+                    "SELECT current_holder_id, is_in_mailbox FROM keys WHERE id = ?",
+                    (key.key_id,),
+                ).fetchone()
+            connection.execute(
+                f"UPDATE keys SET {assignments} WHERE id = ?",
+                parameters,
+            )
+            if holder_before is not None:
+                holder_after = (
+                    fields.get("current_holder_id", holder_before[0]),
+                    fields.get("is_in_mailbox", holder_before[1]),
+                )
+                if holder_before != holder_after:
+                    _record_key_holder_history(connection, key.key_id, *holder_after)
+    return query_key_table(database_path, Key(key_id=key.key_id))
+
 def _normalize_telegram_name(telegram_name: str) -> str:
     telegram_name = telegram_name.strip()
     if not telegram_name.startswith("@"):
         telegram_name = f"@{telegram_name}"
     return telegram_name
-
+#TODO rewrite it similarly to update_key_table
 def update_gym_member(database_path,member:GymMember) -> list[GymMember]:
-    """Update supplied fields and return the updated gym member in a list"""
+    """Update non-None fields by telegram_user_id and return the updated gym member in a list"""
     if member.id is not None:
         raise ValueError("Member id must not be changed!")
     if member.telegram_name is not None:

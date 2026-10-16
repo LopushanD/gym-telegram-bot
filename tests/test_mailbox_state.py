@@ -80,6 +80,9 @@ class MailboxStateTests(unittest.TestCase):
         self.assertEqual((2, 1, 0), self.key_state(1))
         self.assertTrue(user_currently_holds_key(self.path, 200, 1))
         self.assertEqual([(1,), (2,)], self.history_holders(1))
+        self.assertEqual(
+            [False, True], [record.put_into_mailbox for record in get_key_history(self.path, 1)]
+        )
 
     def test_owner_can_take_their_key_from_mailbox_and_return_it(self):
         self.assertEqual(
@@ -92,6 +95,9 @@ class MailboxStateTests(unittest.TestCase):
         )
         self.assertEqual((1, 1, 1), self.key_state(3))
         self.assertEqual([(1,), (1,)], self.history_holders(3))
+        self.assertEqual(
+            [True, False], [record.put_into_mailbox for record in get_key_history(self.path, 3)]
+        )
 
     def test_mailbox_pickup_rejects_key_in_owners_hands(self):
         for telegram_user_id in (100, 200):
@@ -142,6 +148,7 @@ class MailboxStateTests(unittest.TestCase):
         change_key_holder(self.path, 3, 2)
         self.assertEqual((2, 1, 0), self.key_state(3))
         self.assertEqual([(2,)], self.history_holders(3))
+        self.assertIs(get_key_history(self.path, 3)[0].put_into_mailbox, False)
 
     def test_admin_give_key_clears_mailbox_flag_even_when_given_to_owner(self):
         self.assertEqual(GiveKeyStatus.GIVEN, give_key_to_member(self.path, 3, 100).status)
@@ -172,6 +179,9 @@ class MailboxStateTests(unittest.TestCase):
                         )
                         self.assertEqual(GiveKeyStatus.GIVEN, result.status)
                         self.assertEqual((member_id, 1, int(is_in_mailbox)), self.key_state(3))
+                        record = get_key_history(self.path, 3)[0]
+                        self.assertIs(record.put_into_mailbox, is_in_mailbox)
+                        self.assertEqual(member_id, record.member.id)
         self.assertEqual([(1,), (2,)] * 4, self.history_holders(3))
 
     def test_pickup_from_non_owners_mailbox_records_recipient_in_hands(self):
@@ -227,9 +237,9 @@ class MailboxStateTests(unittest.TestCase):
     def test_activation_changes_do_not_change_location_or_add_history(self):
         for key_id in (1, 3):
             state_before = self.key_state(key_id)
-            for active in (False, True):
+            for active in (False, False, True, True):
                 with self.subTest(key_id=key_id, active=active):
-                    self.assertTrue(set_key_active(self.path, key_id, active))
+                    self.assertIs(set_key_active(self.path, key_id, active), True)
                     self.assertEqual(state_before, self.key_state(key_id))
                     self.assertIs(get_key_status(self.path, key_id)[0].is_active, active)
                     self.assertEqual([], self.history_holders(key_id))
@@ -291,6 +301,28 @@ class MailboxStateTests(unittest.TestCase):
         self.assertEqual((1, 1, 0), self.key_state(2))
         self.assertEqual((1, 1, 1), self.key_state(3))
 
+    def test_reinitialization_preserves_history_destinations_after_key_moves(self):
+        change_key_holder(self.path, 1, 1, is_in_mailbox=True)
+        change_key_holder(self.path, 1, 1)
+
+        initialize_database(self.path)
+        initialize_database(self.path)
+
+        self.assertEqual(
+            [False, True], [record.put_into_mailbox for record in get_key_history(self.path, 1)]
+        )
+
+    def test_history_rejects_invalid_mailbox_destinations(self):
+        return_key_to_mailbox(self.path, 200, 1)
+        for value in (None, -1, 2):
+            with self.subTest(value=value):
+                with self.assertRaises(sqlite3.IntegrityError), database_connection(self.path) as connection:
+                    connection.execute(
+                        "UPDATE key_holder_history SET put_into_mailbox = ? WHERE key_id = 1",
+                        (value,),
+                    )
+        self.assertIs(get_key_history(self.path, 1)[0].put_into_mailbox, True)
+
     def test_seeded_mailbox_keys_start_in_mailboxes(self):
         _, key_ids = populate_test_mailboxes_and_keys(self.path)
         for key_id in key_ids:
@@ -324,11 +356,17 @@ class MailboxMigrationTests(unittest.TestCase):
                 connection.execute("SELECT * FROM keys ORDER BY id").fetchall(),
             )
             self.assertEqual(
-                [(1, 2, 20, "2026-01-01 12:00:00")],
+                [(1, 2, 20, "2026-01-01 12:00:00", 0)],
                 connection.execute("SELECT * FROM key_holder_history").fetchall(),
             )
         with self.assertRaises(sqlite3.IntegrityError), database_connection(path) as connection:
             connection.execute("UPDATE keys SET is_in_mailbox = 2 WHERE id = 1")
+        for value in (None, -1, 2):
+            with self.subTest(value=value):
+                with self.assertRaises(sqlite3.IntegrityError), database_connection(path) as connection:
+                    connection.execute(
+                        "UPDATE key_holder_history SET put_into_mailbox = ?", (value,)
+                    )
         with database_connection(path) as connection:
             connection.execute("UPDATE keys SET is_in_mailbox = 1 WHERE id = 1")
         initialize_database(path)

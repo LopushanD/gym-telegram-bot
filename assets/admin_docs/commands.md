@@ -12,9 +12,18 @@ If you enter a command that requires at least one input with no inputs, you will
 `/adduser telegram_id name surname room telegram_name`
 Register a new gym member\.
 
+`/addkey owner_telegram_id [key_name]`
+Create one inactive key owned and held by a registered member\.
+Key name defaults to "Unnamed"\.
+
 `/updateuser telegram_id option value [option value ...]`
 Update specific gym member fields\. Options can be supplied in any order\.
 Available options: `-n` or `--name`, `-s` or `--surname`, `-r` or `--room`, `-t` or `--telegram-name`\.
+
+`/keyupdate key_id option value [option value ...]`
+Update specific key fields\. Options can be supplied in any order\.
+Available options: `-c` or `--current-holder`, `-o` or `--owner`, `-a` or `--activate`, `-n` or `--name`, `-m` or `--mailbox`\.
+Holder and owner values are Telegram IDs\. Active and mailbox values are `True` or `False`\.
 
 `/users option value [option value ...]`
 List gym members matching the optional filters\.

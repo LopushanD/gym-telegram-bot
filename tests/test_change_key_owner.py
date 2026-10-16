@@ -117,7 +117,7 @@ class SetKeyOwnerTests(unittest.TestCase):
 
     def test_changes_only_owner_and_preserves_holder_history(self):
         history = get_key_history(self.database_path, self.key_id)
-        self.assertTrue(set_key_owner(self.database_path, self.key_id, self.owner.id))
+        self.assertIs(set_key_owner(self.database_path, self.key_id, self.owner.id), True)
         status, holder, owner = get_key_status(self.database_path, self.key_id)
         self.assertEqual(status.owner_member_id, self.owner.id)
         self.assertEqual(owner, self.owner)
@@ -132,10 +132,10 @@ class SetKeyOwnerTests(unittest.TestCase):
         self.assertEqual(status, updated_history[0].key)
 
     def test_setting_same_owner_succeeds(self):
-        self.assertTrue(set_key_owner(self.database_path, self.key_id, self.holder.id))
+        self.assertIs(set_key_owner(self.database_path, self.key_id, self.holder.id), True)
 
     def test_returns_false_for_missing_key(self):
-        self.assertFalse(set_key_owner(self.database_path, 999, self.owner.id))
+        self.assertIs(set_key_owner(self.database_path, 999, self.owner.id), False)
 
     def test_rejects_nonexistent_owner_without_changing_key(self):
         before = get_key_status(self.database_path, self.key_id)

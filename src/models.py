@@ -43,6 +43,7 @@ class KeyHistoryRecord:
     key: Key
     member: GymMember
     taken_at: datetime
+    put_into_mailbox: bool = False
 
 def _format_key_label(key_id: int | None, name: str | None) -> str:
     return f"{key_id or ""} ({name or "Unnamed"})"

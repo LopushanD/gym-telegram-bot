@@ -111,7 +111,7 @@ class KeyNameTests(unittest.IsolatedAsyncioTestCase):
         with database_connection(legacy) as connection:
             self.assertEqual((7, 10, 20, 1, "Unnamed", 0),
                              connection.execute("SELECT * FROM keys").fetchone())
-            self.assertEqual((1, 7, 10, "2026-01-01 12:00:00"),
+            self.assertEqual((1, 7, 10, "2026-01-01 12:00:00", 0),
                              connection.execute("SELECT * FROM key_holder_history").fetchone())
             with self.assertRaises(sqlite3.IntegrityError):
                 connection.execute("UPDATE keys SET name = NULL")
